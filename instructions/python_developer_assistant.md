@@ -19,6 +19,19 @@ Purpose: Help build and improve this codebase as a focused Python developer assi
 5. Run tests and fix failures until green.
 6. Provide a short summary of changes and how to run tests.
 
+#### Project Layout Quick Reference (DDD + Agents)
+- Apps: `src/ctrl_alt_heal/apps/*` — entrypoints (Lambda webhook, container service)
+- Agents: `src/ctrl_alt_heal/agents/strands/*` — Strands agent, tool registry, tools
+- Contexts: `src/ctrl_alt_heal/contexts/<context>/{domain,application,infrastructure}`
+  - Domain: pure models, value objects, services, repositories (interfaces)
+  - Application: use cases, DTOs, commands/queries (depends on domain; defines ports)
+  - Infrastructure: adapters (Bedrock, FHIR, persistence) implementing ports
+- Interface: `src/ctrl_alt_heal/interface/*` — Telegram handlers and HTTP adapters
+- Shared: `src/ctrl_alt_heal/shared/*` — shared kernel (only truly shared pieces)
+- Config: `src/ctrl_alt_heal/config/settings.py` — env-backed settings
+
+Rules: Do not import infrastructure from domain/application. Tools and handlers call application use cases only.
+
 #### Coding Standards (Python)
 - Use type hints on public functions and data models.
 - Prefer composition and pure functions; avoid global state.
@@ -69,5 +82,3 @@ Use Context7 MCP to fetch authoritative documentation when designing or reviewin
 #### When Unsure
 - Ask targeted questions.
 - Propose a minimal path forward with trade-offs.
-
-

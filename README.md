@@ -76,8 +76,11 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
    cd Ctrl-Alt-Heal
    ```
 
-2. **Install dependencies**
+2. **Create and activate a virtual environment, then install dependencies**
    ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install --upgrade pip
    pip install -r requirements.txt
    ```
 
@@ -87,9 +90,20 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
    # Edit .env with your configuration
    ```
 
-4. **Run the bot**
+4. **CDK (infra) setup and deploy**
    ```bash
-   python main.py
+   cd infra/cdk
+   npm install
+   AWS_PROFILE=your-sso-profile npm run cdk -- bootstrap
+   AWS_PROFILE=your-sso-profile npm run deploy
+   ```
+
+5. **Set Telegram webhook**
+   ```bash
+   export TELEGRAM_BOT_TOKEN=...   # or store in Secrets Manager as provisioned by CDK
+   export TELEGRAM_WEBHOOK_SECRET=...
+   export WEBHOOK_URL="https://<api-id>.execute-api.<region>.amazonaws.com/telegram/webhook"
+   python scripts/set_telegram_webhook.py
    ```
 
 ## 📱 Usage
@@ -116,6 +130,7 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
 ```env
 # Telegram Configuration
 TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_WEBHOOK_SECRET=your_webhook_secret
 
 # AWS Configuration
 AWS_ACCESS_KEY_ID=your_access_key
@@ -130,6 +145,25 @@ DATABASE_URL=your_database_url
 
 # FHIR Server
 FHIR_SERVER_URL=your_fhir_server_url
+```
+
+### Virtual environment (recommended)
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### AWS SSO profile usage
+- Login once:
+```bash
+aws sso login --profile your-sso-profile
+```
+- Use with CDK:
+```bash
+AWS_PROFILE=your-sso-profile npm run deploy
+# or
+npm run deploy -- --profile your-sso-profile
 ```
 
 ## 🧪 Development
@@ -210,3 +244,58 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **⚠️ Medical Disclaimer**: This application is designed to assist with medication adherence and healthcare communication but should not replace professional medical advice. Always consult with healthcare providers for medical decisions.
 
 **Made with ❤️ for better healthcare outcomes**
+
+### Local development with ngrok (webhook testing)
+
+1) Start a local webhook server that calls the Lambda handler
+
+```bash
+pip install fastapi uvicorn
+```
+
+Create `scripts/local_webhook.py` with:
+
+```python
+from __future__ import annotations
+from fastapi import FastAPI, Request, Response
+from src.ctrl_alt_heal.apps.telegram_webhook_lambda.handler import handler as lambda_handler
+
+app = FastAPI()
+
+@app.post("/telegram/webhook")
+async def webhook(req: Request) -> Response:
+    body = await req.body()
+    event = {
+        "headers": {k: v for k, v in req.headers.items()},
+        "body": body.decode("utf-8"),
+        "isBase64Encoded": False,
+    }
+    result = lambda_handler(event, None)
+    return Response(content=result.get("body", "ok"), status_code=result.get("statusCode", 200))
+```
+
+Run it:
+
+```bash
+uvicorn scripts.local_webhook:app --host 0.0.0.0 --port 8080 --reload
+```
+
+2) Expose it with ngrok
+
+```bash
+ngrok http 8080
+# Copy the https URL printed, e.g. https://abcd-1234.ngrok-free.app
+```
+
+3) Point Telegram to your ngrok URL
+
+```bash
+export TELEGRAM_BOT_TOKEN=...
+export TELEGRAM_WEBHOOK_SECRET=...
+export WEBHOOK_URL="https://abcd-1234.ngrok-free.app/telegram/webhook"
+python scripts/set_telegram_webhook.py
+```
+
+Notes:
+- The same handler logic runs locally and in Lambda (secret header is validated if provided).
+- Stop ngrok or server when done; re-run the webhook script if the URL changes.

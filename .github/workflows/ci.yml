@@ -31,4 +31,3 @@ jobs:
 
       - name: Type check (mypy)
         run: mypy --install-types --non-interactive .
-
