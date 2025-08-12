@@ -9,12 +9,12 @@ from src.ctrl_alt_heal.contexts.prescriptions.application.use_cases import (
 
 @dataclass
 class FakeExtractor(ep.PrescriptionExtractor):
-    def extract(self, data: ep.ExtractionInput) -> ep.ExtractionResult:  # type: ignore[override]
+    def extract(self, data: ep.ExtractionInput) -> ep.ExtractionResult:
         return ep.ExtractionResult(raw_json={"ok": True}, confidence=0.9)
 
 
 def test_extract_prescription_happy_path() -> None:
-    extractor = FakeExtractor()  # type: ignore[abstract]
+    extractor = FakeExtractor()
     result = ep.extract_prescription(
         extractor, ep.ExtractionInput(s3_bucket="b", s3_key="k")
     )

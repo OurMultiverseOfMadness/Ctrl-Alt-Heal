@@ -23,7 +23,9 @@ def _get_bot_token(settings: Settings) -> str:
         sm = boto3.client("secretsmanager")
         try:
             resp = sm.get_secret_value(SecretId=token_arn)
-            token = resp.get("SecretString", token)
+            secret_val = resp.get("SecretString")
+            if isinstance(secret_val, str):
+                token = secret_val
         except Exception:
             pass
     if not token:
@@ -39,10 +41,14 @@ def _resolve_file_path(settings: Settings, token: str, file_id: str) -> str:
     url = f"{_telegram_api_base(settings)}/bot{token}/getFile"
     resp = requests.get(url, params={"file_id": file_id}, timeout=15)
     resp.raise_for_status()
-    data = resp.json()
+    data: dict[str, Any] = resp.json()
     if not data.get("ok"):
         raise RuntimeError("Telegram getFile failed")
-    return data["result"]["file_path"]
+    result = data.get("result", {})
+    file_path = result.get("file_path")
+    if not isinstance(file_path, str):
+        raise RuntimeError("Missing file_path")
+    return file_path
 
 
 def _download_file(settings: Settings, token: str, file_path: str) -> bytes:

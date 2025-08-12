@@ -16,7 +16,10 @@ class StrandsAgent:
         tool = self.tools.get(intent)
         if tool is None:
             return {"error": f"unknown_intent:{intent}"}
-        return tool(payload)
+        result = tool(payload)
+        if not isinstance(result, dict):
+            return {"error": "tool_invalid_return"}
+        return result
 
     @staticmethod
     def default() -> StrandsAgent:

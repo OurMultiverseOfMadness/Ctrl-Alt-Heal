@@ -18,7 +18,8 @@ def _get_secret(arn: str | None) -> str | None:
     sm = boto3.client("secretsmanager")
     try:
         get = sm.get_secret_value(SecretId=arn)
-        return get.get("SecretString")
+        val = get.get("SecretString")
+        return str(val) if isinstance(val, str) else None
     except Exception:
         return None
 
