@@ -81,27 +81,28 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             },
         )
 
-    # If file is present, delegate to Strands tool (ingest + extract)
+    # Delegate everything to Strands auto-router and send the reply
     try:
-        if message and ("document" in message or "photo" in message):
+        if chat_id is not None and message:
             agent = StrandsAgent.default()
-            _ = agent.handle("ingest_prescription_file", {"update": update})
-            if chat_id is not None:
-                _send_message(
-                    chat_id,
-                    "Got your prescription. I will parse it and set up reminders.",
-                    settings,
-                )
+            out = agent.handle("auto", {"update": update})
+            reply = out.get("reply")
+            if isinstance(reply, str) and reply:
+                _send_message(chat_id, reply, settings)
     except Exception as exc:
-        logger.exception("file_ingest_error", extra={"error": str(exc)})
-        if chat_id is not None:
-            _send_message(chat_id, "Sorry, I couldn't process that file.", settings)
+        logger.exception("auto_route_error", extra={"error": str(exc)})
 
-    # For plain text, simple acknowledgment for now
-    if chat_id is not None and message and "text" in message:
-        logger.info("text_acknowledged")
-        _send_message(
-            chat_id, "Thanks! How can I help with your recovery today?", settings
-        )
+    # For plain text (non-command), route to chat tool via Strands
+    if (
+        chat_id is not None
+        and message
+        and "text" in message
+        and not str(message.get("text", "")).startswith("/")
+    ):
+        agent = StrandsAgent.default()
+        out = agent.handle("chat", {"text": str(message.get("text", ""))})
+        reply = out.get("reply") or "How can I help with your recovery today?"
+        logger.info("text_routed_to_chat")
+        _send_message(chat_id, str(reply), settings)
 
     return {"statusCode": 200, "body": "ok"}

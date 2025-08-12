@@ -20,8 +20,12 @@ class StrandsAgent:
 
     @staticmethod
     def default() -> StrandsAgent:
+        from .tools.auto import auto_tool
+        from .tools.chat import chat_tool
         from .tools.ingest_prescription import ingest_prescription_file_tool
 
         agent = StrandsAgent()
         agent.register_tool("ingest_prescription_file", ingest_prescription_file_tool)
+        agent.register_tool("chat", chat_tool)
+        agent.register_tool("auto", auto_tool)
         return agent

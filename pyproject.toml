@@ -15,3 +15,5 @@ strict = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 exclude = ["^docs/", "^tests/fixtures/"]
+ignore_missing_imports = true
+namespace_packages = true
