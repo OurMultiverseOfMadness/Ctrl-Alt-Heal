@@ -5,31 +5,103 @@ import os
 from typing import Any
 
 import boto3
+import requests
+
+from ...agents.strands.agent import StrandsAgent
+from ...config.settings import Settings
+from ...shared.infrastructure.logger import get_logger
+
+
+def _get_secret(arn: str | None) -> str | None:
+    if not arn:
+        return None
+    sm = boto3.client("secretsmanager")
+    try:
+        get = sm.get_secret_value(SecretId=arn)
+        return get.get("SecretString")
+    except Exception:
+        return None
+
+
+def _get_bot_token(settings: Settings) -> str:
+    token = settings.telegram_bot_token
+    if not token:
+        token = _get_secret(settings.telegram_bot_token_secret_arn) or ""
+    if not token:
+        raise RuntimeError("Telegram bot token not configured")
+    return token
+
+
+def _send_message(chat_id: int, text: str, settings: Settings) -> None:
+    token = _get_bot_token(settings)
+    url = f"{settings.telegram_api_url}/bot{token}/sendMessage"
+    try:
+        requests.post(
+            url, json={"chat_id": chat_id, "text": text}, timeout=10
+        ).raise_for_status()
+    except Exception:
+        # Avoid failing webhook on send errors
+        pass
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    # Minimal AWS Lambda handler stub for Telegram webhook.
-    # Validates basic shape and returns 200 to satisfy Telegram retries.
-    # Load webhook secret from Secrets Manager if ARN provided
-    secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET")
-    secret_arn = os.environ.get("TELEGRAM_WEBHOOK_SECRET_ARN")
-    if secret_arn:
-        sm = boto3.client("secretsmanager")
-        try:
-            get = sm.get_secret_value(SecretId=secret_arn)
-            secret = get.get("SecretString", secret)
-        except Exception:
-            pass
+    logger = get_logger(__name__)
+    settings = Settings.load()
+
+    # Validate webhook secret (if present)
+    secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET") or _get_secret(
+        settings.telegram_webhook_secret_arn
+    )
     if secret:
-        # For HTTP API v2 payloads, headers are under event['headers']
         headers = event.get("headers") or {}
         token = headers.get("x-telegram-bot-api-secret-token") or headers.get(
             "X-Telegram-Bot-Api-Secret-Token"
         )
         if token != secret:
+            logger.warning("webhook_auth_failed")
             return {"statusCode": 403, "body": "forbidden"}
+
     try:
-        _ = json.loads(event.get("body", "{}"))
+        update = json.loads(event.get("body", "{}"))
     except json.JSONDecodeError:
+        logger.warning("invalid_json_body")
         return {"statusCode": 400, "body": "invalid json"}
+
+    chat_id: int | None = None
+    message = update.get("message") or update.get("edited_message")
+    if message and isinstance(message, dict):
+        chat = message.get("chat") or {}
+        chat_id = chat.get("id")
+        logger.info(
+            "update_received",
+            extra={
+                "has_document": bool("document" in message),
+                "has_photo": bool("photo" in message),
+                "has_text": bool("text" in message),
+            },
+        )
+
+    # If file is present, delegate to Strands tool (ingest + extract)
+    try:
+        if message and ("document" in message or "photo" in message):
+            agent = StrandsAgent.default()
+            _ = agent.handle("ingest_prescription_file", {"update": update})
+            if chat_id is not None:
+                _send_message(
+                    chat_id,
+                    "Got your prescription. I will parse it and set up reminders.",
+                    settings,
+                )
+    except Exception as exc:
+        logger.exception("file_ingest_error", extra={"error": str(exc)})
+        if chat_id is not None:
+            _send_message(chat_id, "Sorry, I couldn't process that file.", settings)
+
+    # For plain text, simple acknowledgment for now
+    if chat_id is not None and message and "text" in message:
+        logger.info("text_acknowledged")
+        _send_message(
+            chat_id, "Thanks! How can I help with your recovery today?", settings
+        )
+
     return {"statusCode": 200, "body": "ok"}

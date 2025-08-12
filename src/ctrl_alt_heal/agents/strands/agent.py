@@ -17,3 +17,11 @@ class StrandsAgent:
         if tool is None:
             return {"error": f"unknown_intent:{intent}"}
         return tool(payload)
+
+    @staticmethod
+    def default() -> StrandsAgent:
+        from .tools.ingest_prescription import ingest_prescription_file_tool
+
+        agent = StrandsAgent()
+        agent.register_tool("ingest_prescription_file", ingest_prescription_file_tool)
+        return agent
