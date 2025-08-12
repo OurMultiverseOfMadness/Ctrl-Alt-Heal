@@ -44,7 +44,13 @@ def get_webhook_info(token: str, api_url: str) -> dict[str, Any]:
     url = f"{api_url}/bot{token}/getWebhookInfo"
     r = requests.get(url, timeout=15)
     r.raise_for_status()
-    return r.json()
+    data_obj = r.json()
+    result: dict[str, Any] = {}
+    if isinstance(data_obj, dict):
+        result = data_obj
+    else:
+        raise ValueError("Invalid webhook info JSON structure")
+    return result
 
 
 def set_webhook(token: str, api_url: str, webhook_url: str, secret: str | None) -> None:

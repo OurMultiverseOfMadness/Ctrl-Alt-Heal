@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import json as _json
 import os
+import urllib.error
+import urllib.request
 from typing import Any
 
 import boto3
-import requests
 
 from ...agents.strands.agent import StrandsAgent
 from ...config.settings import Settings
@@ -36,11 +38,14 @@ def _get_bot_token(settings: Settings) -> str:
 def _send_message(chat_id: int, text: str, settings: Settings) -> None:
     token = _get_bot_token(settings)
     url = f"{settings.telegram_api_url}/bot{token}/sendMessage"
+    payload_bytes = _json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=payload_bytes, headers={"Content-Type": "application/json"}
+    )
     try:
-        requests.post(
-            url, json={"chat_id": chat_id, "text": text}, timeout=10
-        ).raise_for_status()
-    except Exception:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except urllib.error.URLError:
         # Avoid failing webhook on send errors
         pass
 

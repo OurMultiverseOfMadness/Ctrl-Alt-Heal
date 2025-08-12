@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json as _json
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
 import boto3
-import requests
 
 from ...config.settings import Settings
 
@@ -38,10 +40,13 @@ def _telegram_api_base(settings: Settings) -> str:
 
 
 def _resolve_file_path(settings: Settings, token: str, file_id: str) -> str:
-    url = f"{_telegram_api_base(settings)}/bot{token}/getFile"
-    resp = requests.get(url, params={"file_id": file_id}, timeout=15)
-    resp.raise_for_status()
-    data: dict[str, Any] = resp.json()
+    url = f"{_telegram_api_base(settings)}/bot{token}/getFile?file_id={file_id}"
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:  # nosec B310
+            body = r.read()
+    except urllib.error.URLError as exc:
+        raise RuntimeError("Telegram getFile failed") from exc
+    data: dict[str, Any] = _json.loads(body.decode("utf-8"))
     if not data.get("ok"):
         raise RuntimeError("Telegram getFile failed")
     result = data.get("result", {})
@@ -53,9 +58,11 @@ def _resolve_file_path(settings: Settings, token: str, file_id: str) -> str:
 
 def _download_file(settings: Settings, token: str, file_path: str) -> bytes:
     url = f"{_telegram_api_base(settings)}/file/bot{token}/{file_path}"
-    resp = requests.get(url, timeout=60)
-    resp.raise_for_status()
-    return resp.content
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r:  # nosec B310
+            return r.read()
+    except urllib.error.URLError as exc:
+        raise RuntimeError("Telegram file download failed") from exc
 
 
 def download_and_store_telegram_file(
