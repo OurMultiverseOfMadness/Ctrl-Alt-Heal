@@ -10,7 +10,7 @@ import boto3
 class SchedulerManager:
     def __init__(self) -> None:
         self._client = boto3.client(
-            "scheduler", region_name=os.environ.get("AWS_REGION", "us-east-1")
+            "scheduler", region_name=os.environ.get("AWS_REGION", "ap-southeast-1")
         )
         self._group = os.environ.get("SCHEDULE_GROUP", "ctrl-alt-heal-reminders")
         self._target_arn = os.environ.get("REMINDER_TARGET_ARN", "")
