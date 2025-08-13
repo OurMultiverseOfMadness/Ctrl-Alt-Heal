@@ -42,9 +42,7 @@ class Settings:
             bedrock_extract_model_id=os.environ.get(
                 "BEDROCK_EXTRACT_MODEL_ID", "apac.amazon.nova-lite-v1:0"
             ),
-            bedrock_api_token=os.environ.get(
-                "AWS_BEARER_TOKEN_BEDROCK"
-            ),
+            bedrock_api_token=os.environ.get("AWS_BEARER_TOKEN_BEDROCK"),
             telegram_api_url=os.environ.get(
                 "TELEGRAM_API_URL", "https://api.telegram.org"
             ),

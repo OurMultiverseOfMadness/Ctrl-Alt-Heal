@@ -1,11 +1,9 @@
-from src.ctrl_alt_heal.config.settings import Settings
-from src.ctrl_alt_heal.contexts.prescriptions.domain.prescription import Prescription
+from dotenv import load_dotenv
 from strands import Agent, tool
 from strands.models import BedrockModel
-import boto3
-import os
-from dotenv import load_dotenv
 
+from src.ctrl_alt_heal.config.settings import Settings
+from src.ctrl_alt_heal.contexts.prescriptions.domain.prescription import Prescription
 
 INPUT_SCHEMA = {
     "type": "object",
@@ -36,8 +34,9 @@ bedrock_model = BedrockModel(
 )
 
 prescription_extraction_prompt = (
-    "You are a trained pharmacists who is experienced in reading prescriptions from doctors"
-    "Analyse the image you are given and extract the names of the medication and the corresponding dosage and frequencies from the images"
+    "You are a trained pharmacist experienced in reading prescriptions from doctors."
+    " Analyze the provided image(s) and extract each medication with its dosage "
+    "and frequency."
 )
 
 
@@ -47,8 +46,8 @@ prescription_extraction_prompt = (
 )
 def extract_prescription(summary) -> Prescription | None:
     """
-    Given a string summary of the prescription label extracted, summarise the information in to a machine readable format using the Prescription Python
-    pydantic data model.
+    Summarise the extracted prescription label into the Prescription
+    pydantic data model (machine-readable format).
     """
 
     agent = Agent(model=bedrock_model, system_prompt=prescription_extraction_prompt)
