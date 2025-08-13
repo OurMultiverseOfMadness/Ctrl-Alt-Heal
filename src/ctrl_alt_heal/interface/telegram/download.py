@@ -93,8 +93,11 @@ def download_and_store_telegram_file(
     if not bucket:
         raise RuntimeError("DOCS_BUCKET not set")
 
-    # Create a deterministic S3 key using Telegram file path
-    s3_key = f"telegram/{file_path}"
+    # Create a deterministic S3 key partitioned by chat_id and Telegram file path
+    chat = message.get("chat") or {}
+    chat_id_val = chat.get("id")
+    chat_id_str = str(chat_id_val) if chat_id_val is not None else "unknown"
+    s3_key = f"telegram/{chat_id_str}/{file_path}"
     s3 = boto3.client("s3")
     extra: dict[str, Any] = {}
     if mime_type:

@@ -11,7 +11,12 @@ import boto3
 
 from ...agents.strands.agent import StrandsAgent
 from ...config.settings import Settings
+from ...contexts.prescriptions.application.use_cases.extract_prescription import (
+    extract_prescription,
+    extract_prescriptions_list,
+)
 from ...shared.infrastructure.logger import get_logger
+from ...shared.infrastructure.state_store import clear_state, get_state, set_state
 
 
 def _get_secret(arn: str | None) -> str | None:
@@ -48,6 +53,51 @@ def _send_message(chat_id: int, text: str, settings: Settings) -> None:
     except urllib.error.URLError:
         # Avoid failing webhook on send errors
         pass
+
+
+def _compose_single_summary(res: dict[str, Any]) -> str:
+    data = res.get("extraction")
+    if isinstance(data, dict):
+        # Try common shapes
+        med = None
+        meds = (
+            data.get("medications")
+            if isinstance(data.get("medications"), list)
+            else None
+        )
+        if meds and isinstance(meds, list) and meds and isinstance(meds[0], dict):
+            med = meds[0]
+        else:
+            med = data
+        if isinstance(med, dict):
+            name = med.get("name") or med.get("medication") or "(unknown)"
+            dose = med.get("dosage") or med.get("dose") or "(dose unknown)"
+            freq = (
+                med.get("frequency") or (med.get("frequency") or {}).get("free_text")
+                if isinstance(med.get("frequency"), dict)
+                else None
+            ) or "(frequency unknown)"
+            return (
+                f"Parsed: {name} — {dose}, {freq}\n"
+                "Is this correct? Reply 'yes' or 'no'."
+            )
+    return "Parsed the label. Is this correct? Reply 'yes' or 'no'."
+
+
+def _compose_multi_summary(res: dict[str, Any]) -> str:
+    items = res.get("items")
+    if isinstance(items, list) and items:
+        lines: list[str] = []
+        for item in items[:3]:
+            if isinstance(item, dict):
+                name = item.get("name") or "(unknown)"
+                dose = item.get("dosage") or "(dose unknown)"
+                freq = item.get("frequency") or "(frequency unknown)"
+                lines.append(f"- {name}: {dose}, {freq}")
+        more = "" if len(items) <= 3 else f"\n(+{len(items)-3} more)"
+        body = "\n".join(lines) + more
+        return f"Parsed medications:\n{body}\nIs this correct? Reply 'yes' or 'no'."
+    return "Parsed the prescription. Is this correct? Reply 'yes' or 'no'."
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -98,22 +148,73 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             # If user replies 'label' or 'prescription', route accordingly
             if isinstance(message.get("text"), str):
                 text_lower = str(message.get("text")).strip().lower()
+                state = get_state(chat_id)
                 if text_lower in {"label", "/label"}:
+                    set_state(
+                        chat_id, {"pending_correction": True, "source_type": "label"}
+                    )
                     res = agent.handle("ingest_prescription_file", {"update": update})
-                    confirm = (
-                        "Got your label. I will parse it and set up reminders."
-                        if not res.get("error")
-                        else "Sorry, I couldn't process that file."
-                    )
-                    _send_message(chat_id, confirm, settings)
+                    if res.get("error"):
+                        _send_message(
+                            chat_id, "Sorry, I couldn't process that file.", settings
+                        )
+                    else:
+                        summary = _compose_single_summary(res)
+                        _send_message(chat_id, summary, settings)
                 elif text_lower in {"prescription", "/prescription"}:
-                    res = agent.handle("ingest_prescription_multi", {"update": update})
-                    confirm = (
-                        "Got your prescription. I will parse all medications."
-                        if not res.get("error")
-                        else "Sorry, I couldn't process that file."
+                    set_state(
+                        chat_id,
+                        {"pending_correction": True, "source_type": "prescription"},
                     )
-                    _send_message(chat_id, confirm, settings)
+                    res = agent.handle("ingest_prescription_multi", {"update": update})
+                    if res.get("error"):
+                        _send_message(
+                            chat_id, "Sorry, I couldn't process that file.", settings
+                        )
+                    else:
+                        summary = _compose_multi_summary(res)
+                        _send_message(chat_id, summary, settings)
+                elif text_lower in {"yes", "/yes"}:
+                    _send_message(
+                        chat_id, "Great! I will set up reminders next.", settings
+                    )
+                    clear_state(chat_id)
+                elif text_lower in {"no", "/no"}:
+                    _send_message(
+                        chat_id,
+                        "Okay. Please type corrections (dose/frequency).",
+                        settings,
+                    )
+                elif state.get("pending_correction") and not text_lower.startswith("/"):
+                    # Treat text as corrections and re-run appropriate extractor
+                    source_type = state.get("source_type")
+                    if source_type == "label":
+                        model = extract_prescription(
+                            summary=str(message.get("text", ""))
+                        )
+                        if model is None:
+                            _send_message(
+                                chat_id, "Sorry, I couldn't process that.", settings
+                            )
+                        else:
+                            res = {"extraction": model.model_dump()}  # type: ignore[attr-defined]
+                            _send_message(
+                                chat_id, _compose_single_summary(res), settings
+                            )
+                    elif source_type == "prescription":
+                        models = extract_prescriptions_list(
+                            summary=str(message.get("text", ""))
+                        )
+                        if not models:
+                            _send_message(
+                                chat_id, "Sorry, I couldn't process that.", settings
+                            )
+                        else:
+                            items = [m.model_dump() for m in models]  # type: ignore[attr-defined]
+                            res = {"items": items}
+                            _send_message(
+                                chat_id, _compose_multi_summary(res), settings
+                            )
     except Exception as exc:
         logger.exception("auto_route_error", extra={"error": str(exc)})
 
