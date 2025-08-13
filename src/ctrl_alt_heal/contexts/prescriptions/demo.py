@@ -5,7 +5,6 @@ sys.path.append("../../../..")
 import os
 
 from application.use_cases.extract_prescription import extract_prescription
-from dotenv import load_dotenv
 from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import image_reader
@@ -43,11 +42,9 @@ if __name__ == "__main__":
     print("This is for **LOCAL** demo only!!")
     print("#" * 50)
 
-    if load_dotenv():
-        if not os.getenv("AWS_BEARER_TOKEN_BEDROCK", None):
-            raise ValueError("AWS Bedrock API token not found!")
-        else:
-            print("AWS Bedrock API token!")
+    # For local demo only: ensure AWS credentials/token exist in environment.
+    if os.getenv("AWS_BEARER_TOKEN_BEDROCK") is not None:
+        print("AWS Bedrock API token!")
 
         bedrock_model = BedrockModel(
             model_id="apac.amazon.nova-pro-v1:0", region_name="ap-southeast-1"
@@ -71,6 +68,6 @@ if __name__ == "__main__":
 
     else:
         print(
-            "Ensure you have a .env file with the following keys:\n"
-            "-AWS_ACCESS_KEY_ID\n-AWS_SECRET_ACCESS_KEY\n-AWS_BEARER_TOKEN_BEDROCK"
+            "Ensure your environment provides:\n"
+            "- AWS_ACCESS_KEY_ID\n- AWS_SECRET_ACCESS_KEY\n- AWS_BEARER_TOKEN_BEDROCK"
         )

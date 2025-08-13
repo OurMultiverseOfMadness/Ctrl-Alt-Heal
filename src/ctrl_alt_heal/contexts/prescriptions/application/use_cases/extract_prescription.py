@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 from strands import Agent, tool
 from strands.models import BedrockModel
 
@@ -15,7 +14,6 @@ INPUT_SCHEMA = {
     },
 }
 
-load_dotenv()
 
 settings = Settings.load()
 
