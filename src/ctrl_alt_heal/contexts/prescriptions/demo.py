@@ -1,5 +1,6 @@
 # Please delete this once done
 import sys
+
 sys.path.append("../../../..")
 import os
 from dotenv import load_dotenv
@@ -26,46 +27,42 @@ if __name__ == "__main__":
     
     If you need the actual Python object, you have to call the tool manually.
     """
-    
-    print("#"*50)
+
+    print("#" * 50)
     print("This is for **LOCAL** demo only!!")
-    print("#"*50)
-    
+    print("#" * 50)
+
     if load_dotenv():
-        
         if not os.getenv("AWS_BEARER_TOKEN_BEDROCK", None):
-            
             raise ValueError("AWS Bedrock API token not found!")
-        
+
         else:
-            
             print("AWS Bedrock API token!")
-    
+
         bedrock_model = BedrockModel(
-                model_id="apac.amazon.nova-pro-v1:0",
-                region_name="ap-southeast-1"
-            )
-        
+            model_id="apac.amazon.nova-pro-v1:0", region_name="ap-southeast-1"
+        )
+
         agent = Agent(
             model=bedrock_model,
-            tools = [image_reader, extract_prescription],
-            system_prompt = (
+            tools=[image_reader, extract_prescription],
+            system_prompt=(
                 "Your job is to help patients remember to take their medication on time and in the right amounts/dosage/method of adminstration"
                 "You will be receiving information on the medication that they are prescribed and you will need to extract and summarise that information for them."
                 "Finally you must use the extract_prescription tool to extract the required information in a machine-readable format."
                 "You are to reply only with the JSON representation of the Prescription"
-            )
+            ),
         )
-        
+
         result = agent("./assets/image.jpg")
-        
+
         # print("#" * 50)
         # print("Agent details")
         # print("#" * 50)
         # print(agent.messages)
         # print(agent.state)
-        
+
     else:
-        
-        
-        print("Ensure you have a .env file with the following keys:\n-AWS_ACCESS_KEY_ID\n-AWS_SECRET_ACCESS_KEY\n-AWS_BEARER_TOKEN_BEDROCK")
+        print(
+            "Ensure you have a .env file with the following keys:\n-AWS_ACCESS_KEY_ID\n-AWS_SECRET_ACCESS_KEY\n-AWS_BEARER_TOKEN_BEDROCK"
+        )
