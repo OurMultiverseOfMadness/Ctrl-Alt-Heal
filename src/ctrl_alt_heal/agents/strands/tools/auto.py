@@ -32,7 +32,7 @@ def auto_tool(payload: dict[str, Any]) -> dict[str, Any]:
     if isinstance(text, str) and text.strip():
         cmd, args = parse_command(update)
         if cmd:  # simple built-in command replies
-            logger.info("auto_tool_cmd", extra={"cmd": cmd})
+            logger.info("auto_tool_cmd")
             replies = {
                 "start": (
                     "Welcome! Send a photo or PDF of your prescription to begin."
@@ -51,9 +51,7 @@ def auto_tool(payload: dict[str, Any]) -> dict[str, Any]:
 
         # Conversational chat via model
         out = chat_tool({"text": text})
-        logger.info(
-            "auto_tool_route", extra={"target": "chat", "error": out.get("error")}
-        )
+        logger.info("auto_tool_route")
         return {"tool": "chat", **out}
 
     # Fallback

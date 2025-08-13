@@ -33,15 +33,7 @@ def ingest_prescription_file_tool(payload: dict[str, Any]) -> dict[str, Any]:
         result = extract_prescription(
             extractor, ExtractionInput(s3_bucket=loc.s3_bucket, s3_key=loc.s3_key)
         )
-        logger.info(
-            "tool_outcome",
-            extra={
-                "tool": "ingest_prescription_file",
-                "status": "ok",
-                "s3_key": loc.s3_key,
-                "confidence": result.confidence,
-            },
-        )
+        logger.info("tool_outcome")
         return {
             "status": "ok",
             "s3_bucket": loc.s3_bucket,
@@ -49,13 +41,6 @@ def ingest_prescription_file_tool(payload: dict[str, Any]) -> dict[str, Any]:
             "confidence": result.confidence,
             "extraction": result.raw_json,
         }
-    except Exception as exc:  # pragma: no cover
-        logger.exception(
-            "tool_outcome",
-            extra={
-                "tool": "ingest_prescription_file",
-                "status": "error",
-                "error": str(exc),
-            },
-        )
+    except Exception:  # pragma: no cover
+        logger.exception("tool_outcome")
         return {"error": "ingest_failed"}

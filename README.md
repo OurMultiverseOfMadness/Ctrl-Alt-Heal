@@ -135,7 +135,7 @@ TELEGRAM_WEBHOOK_SECRET=your_webhook_secret
 # AWS Configuration
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_REGION=us-east-1
+AWS_REGION=ap-southeast-1
 
 # Amazon Bedrock
 BEDROCK_MODEL_ID=amazon.nova-1

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 
-class Prescription(BaseModel):
+class Prescription(BaseModel):  # type: ignore[misc]
     name: str = Field(description="Name of the drug/medicine")
     dosage: str = Field(
         description=(

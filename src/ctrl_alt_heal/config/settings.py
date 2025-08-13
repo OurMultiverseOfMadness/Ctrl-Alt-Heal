@@ -27,6 +27,8 @@ class Settings:
     schedule_group: str = "ctrl-alt-heal-reminders"
     reminder_target_arn: str | None = None
     scheduler_role_arn: str | None = None
+    # FHIR persistence
+    fhir_table_name: str | None = None
 
     @staticmethod
     def load() -> Settings:
@@ -54,4 +56,5 @@ class Settings:
             schedule_group=os.environ.get("SCHEDULE_GROUP", "ctrl-alt-heal-reminders"),
             reminder_target_arn=os.environ.get("REMINDER_TARGET_ARN"),
             scheduler_role_arn=os.environ.get("SCHEDULER_ROLE_ARN"),
+            fhir_table_name=os.environ.get("FHIR_TABLE_NAME"),
         )

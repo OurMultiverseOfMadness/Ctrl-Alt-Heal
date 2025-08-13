@@ -18,3 +18,16 @@ exclude = ["^docs/", "^tests/fixtures/", "^infra/cdk/cdk.out/"]
 ignore_missing_imports = true
 namespace_packages = true
 explicit_package_bases = true
+
+[tool.pytest.ini_options]
+testpaths = [
+  "tests",
+]
+norecursedirs = [
+  ".git",
+  ".venv",
+  "node_modules",
+  "infra",
+  "cdk.out",
+]
+addopts = "-q"

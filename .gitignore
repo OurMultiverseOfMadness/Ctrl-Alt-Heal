@@ -206,6 +206,9 @@ infra/cdk/node_modules/
 infra/cdk/cdk.out/
 node_modules/
 
+# Lambda layers (built locally)
+infra/lambda_layers/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

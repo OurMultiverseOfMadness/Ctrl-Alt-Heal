@@ -9,6 +9,7 @@ from typing import Any, cast
 import boto3
 
 from ...config.settings import Settings
+from ...shared.infrastructure.logger import get_logger
 
 
 @dataclass(frozen=True)
@@ -40,35 +41,49 @@ def _telegram_api_base(settings: Settings) -> str:
 
 
 def _resolve_file_path(settings: Settings, token: str, file_id: str) -> str:
+    logger = get_logger(__name__)
     url = f"{_telegram_api_base(settings)}/bot{token}/getFile?file_id={file_id}"
     try:
         with urllib.request.urlopen(url, timeout=15) as r:  # nosec B310
             body = r.read()
     except urllib.error.URLError as exc:
+        logger.warning(
+            "telegram_get_file_error", extra={"file_id": file_id, "error": str(exc)}
+        )
         raise RuntimeError("Telegram getFile failed") from exc
     data: dict[str, Any] = _json.loads(body.decode("utf-8"))
     if not data.get("ok"):
+        logger.warning(
+            "telegram_get_file_not_ok", extra={"file_id": file_id, "resp": data}
+        )
         raise RuntimeError("Telegram getFile failed")
     result = data.get("result", {})
     file_path = result.get("file_path")
     if not isinstance(file_path, str):
+        logger.warning("telegram_missing_file_path", extra={"file_id": file_id})
         raise RuntimeError("Missing file_path")
     return file_path
 
 
 def _download_file(settings: Settings, token: str, file_path: str) -> bytes:
+    logger = get_logger(__name__)
     url = f"{_telegram_api_base(settings)}/file/bot{token}/{file_path}"
     try:
         with urllib.request.urlopen(url, timeout=60) as r:  # nosec B310
             data = r.read()
             return cast(bytes, data)
     except urllib.error.URLError as exc:
+        logger.warning(
+            "telegram_file_download_error",
+            extra={"file_path": file_path, "error": str(exc)},
+        )
         raise RuntimeError("Telegram file download failed") from exc
 
 
 def download_and_store_telegram_file(
     update: dict[str, Any], settings: Settings | None = None
 ) -> DownloadResult:
+    logger = get_logger(__name__)
     settings = settings or Settings.load()
     message = update.get("message") or update.get("edited_message") or {}
     # Prefer documents; else take the best photo size
@@ -83,10 +98,12 @@ def download_and_store_telegram_file(
         if isinstance(photos, list) and photos:
             file_id = photos[-1].get("file_id")
     if not file_id:
+        logger.warning("telegram_no_file_in_update")
         raise ValueError("No file found in update")
 
     token = _get_bot_token(settings)
     file_path = _resolve_file_path(settings, token, file_id)
+    logger.info("telegram_resolved_file")
     blob = _download_file(settings, token, file_path)
 
     bucket = settings.docs_bucket
@@ -103,4 +120,5 @@ def download_and_store_telegram_file(
     if mime_type:
         extra["ContentType"] = mime_type
     s3.put_object(Bucket=bucket, Key=s3_key, Body=blob, **extra)
+    logger.info("s3_put_object")
     return DownloadResult(s3_bucket=bucket, s3_key=s3_key, file_mime_type=mime_type)
