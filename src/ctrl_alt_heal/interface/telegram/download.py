@@ -4,7 +4,7 @@ import json as _json
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import boto3
 
@@ -60,7 +60,8 @@ def _download_file(settings: Settings, token: str, file_path: str) -> bytes:
     url = f"{_telegram_api_base(settings)}/file/bot{token}/{file_path}"
     try:
         with urllib.request.urlopen(url, timeout=60) as r:  # nosec B310
-            return r.read()
+            data = r.read()
+            return cast(bytes, data)
     except urllib.error.URLError as exc:
         raise RuntimeError("Telegram file download failed") from exc
 
