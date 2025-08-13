@@ -13,6 +13,7 @@ class Settings:
     bedrock_region: str | None = None
     bedrock_chat_model_id: str | None = None
     bedrock_extract_model_id: str | None = None
+    bedrock_api_token: str | None = None
 
     # Telegram + Secrets
     telegram_api_url: str = "https://api.telegram.org"
@@ -31,7 +32,7 @@ class Settings:
     def load() -> Settings:
         return Settings(
             telegram_bot_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""),
-            aws_region=os.environ.get("AWS_REGION", "us-east-1"),
+            aws_region=os.environ.get("AWS_REGION", "ap-southeast-1"),
             bedrock_model_id=os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-1"),
             fhir_server_url=os.environ.get("FHIR_SERVER_URL"),
             bedrock_region=os.environ.get("BEDROCK_REGION"),
@@ -39,7 +40,10 @@ class Settings:
                 "BEDROCK_CHAT_MODEL_ID", "amazon.nova-lite-v1"
             ),
             bedrock_extract_model_id=os.environ.get(
-                "BEDROCK_EXTRACT_MODEL_ID", "amazon.nova-pro-v1"
+                "BEDROCK_EXTRACT_MODEL_ID", "apac.amazon.nova-lite-v1:0"
+            ),
+            bedrock_api_token=os.environ.get(
+                "AWS_BEARER_TOKEN_BEDROCK"
             ),
             telegram_api_url=os.environ.get(
                 "TELEGRAM_API_URL", "https://api.telegram.org"

@@ -4,3 +4,9 @@ types-requests>=2.32
 pytest>=8.2
 ruff>=0.5
 mypy>=1.10
+
+pydantic>=2.11.7
+strands-agents>=1.4.0
+strands-agents-tools>=0.2.3
+
+dotenv>=0.9.9
