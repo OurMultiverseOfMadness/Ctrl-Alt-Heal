@@ -11,10 +11,6 @@ import boto3
 
 from ...agents.strands.agent import StrandsAgent
 from ...config.settings import Settings
-from ...contexts.prescriptions.application.use_cases.extract_prescription import (
-    extract_prescription,
-    extract_prescriptions_list,
-)
 from ...shared.infrastructure.logger import get_logger
 from ...shared.infrastructure.state_store import clear_state, get_state, set_state
 
@@ -186,35 +182,34 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         settings,
                     )
                 elif state.get("pending_correction") and not text_lower.startswith("/"):
-                    # Treat text as corrections and re-run appropriate extractor
+                    # Treat text as corrections; summarise via chat tool and re-confirm
                     source_type = state.get("source_type")
+                    correction_text = str(message.get("text", ""))
+                    agent = StrandsAgent.default()
                     if source_type == "label":
-                        model = extract_prescription(
-                            summary=str(message.get("text", ""))
+                        prompt = (
+                            "Summarize this medication as 'name — dose, frequency':\n"
+                            f"{correction_text}"
                         )
-                        if model is None:
-                            _send_message(
-                                chat_id, "Sorry, I couldn't process that.", settings
-                            )
-                        else:
-                            res = {"extraction": model.model_dump()}  # type: ignore[attr-defined]
-                            _send_message(
-                                chat_id, _compose_single_summary(res), settings
-                            )
+                        out = agent.handle("chat", {"text": prompt})
+                        reply = out.get("reply") or "Parsed. Is this correct? yes/no"
+                        _send_message(
+                            chat_id,
+                            f"{reply}\nIs this correct? yes/no",
+                            settings,
+                        )
                     elif source_type == "prescription":
-                        models = extract_prescriptions_list(
-                            summary=str(message.get("text", ""))
+                        prompt = (
+                            "Summarize all medications as a bullet list 'name: dose, "
+                            f"frequency':\n{correction_text}"
                         )
-                        if not models:
-                            _send_message(
-                                chat_id, "Sorry, I couldn't process that.", settings
-                            )
-                        else:
-                            items = [m.model_dump() for m in models]  # type: ignore[attr-defined]
-                            res = {"items": items}
-                            _send_message(
-                                chat_id, _compose_multi_summary(res), settings
-                            )
+                        out = agent.handle("chat", {"text": prompt})
+                        reply = out.get("reply") or "Parsed. Is this correct? yes/no"
+                        _send_message(
+                            chat_id,
+                            f"{reply}\nIs this correct? yes/no",
+                            settings,
+                        )
     except Exception as exc:
         logger.exception("auto_route_error", extra={"error": str(exc)})
 
