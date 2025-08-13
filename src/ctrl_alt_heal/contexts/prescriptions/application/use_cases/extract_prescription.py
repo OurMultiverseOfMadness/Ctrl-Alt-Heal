@@ -34,9 +34,31 @@ bedrock_model = BedrockModel(
 )
 
 prescription_extraction_prompt = (
-    "You are a trained pharmacist experienced in reading prescriptions from doctors."
-    " Analyze the provided image(s) and extract each medication with its dosage "
-    "and frequency."
+    "You are a clinical pharmacist. Extract a single medication from a patient "
+    "prescription and map it to the Prescription model fields.\n\n"
+    "Rules:\n"
+    "- Focus on one medication for this call.\n"
+    "- Fill fields: name, dosage (free text), frequency (free text), totalAmount, "
+    "additionalInstructions.\n"
+    "- Normalise common abbreviations in frequency where possible (e.g., BID→2x/day,"
+    " TDS→3x/day) but keep original in free text.\n"
+    "- If a field is unknown or illegible, leave it empty and add context in "
+    "additionalInstructions (e.g., 'illegible strength').\n"
+    "- Do not hallucinate missing data.\n"
+    "- Use source wording when uncertain.\n"
+)
+
+multi_prescription_extraction_prompt = (
+    "You are a clinical pharmacist. Extract all medications from a prescription and "
+    "map them to the following JSON array of Prescription objects.\n\n"
+    "Rules:\n"
+    "- Return a JSON array of items, one per medication.\n"
+    "- For each item, fill: name, dosage (free text), frequency (free text), "
+    "totalAmount, additionalInstructions.\n"
+    "- Normalise freq. when possible (BID→2x/day, TDS→3x/day) and keep the original "
+    "in free text.\n"
+    "- Unknown/illegible: leave empty and note the reason in additionalInstructions.\n"
+    "- Do not hallucinate missing data. Use source wording when uncertain.\n"
 )
 
 
@@ -59,5 +81,34 @@ def extract_prescription(summary) -> Prescription | None:
         print(e)
         return None
 
+    else:
+        return results
+
+
+@tool(
+    description=(
+        "Reads a prescription summary and returns a list of Prescription Python objects"
+    ),
+    inputSchema=INPUT_SCHEMA,
+)
+def extract_prescriptions_list(summary) -> list[Prescription] | None:
+    """
+    Summarise the extracted prescription label into a list of Prescription
+    objects (machine-readable format) when multiple medications are present.
+    """
+
+    agent = Agent(
+        model=bedrock_model, system_prompt=multi_prescription_extraction_prompt
+    )
+
+    try:
+        # Expect an array of Prescription models
+        results: list[Prescription] = agent.structured_output(  # type: ignore[assignment]
+            list[Prescription],
+            [{"text": summary}],
+        )
+    except Exception as e:
+        print(e)
+        return None
     else:
         return results

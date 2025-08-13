@@ -5,7 +5,6 @@ from typing import Any
 from ....interface.telegram.handlers.router import parse_command
 from ....shared.infrastructure.logger import get_logger
 from .chat import chat_tool
-from .ingest_prescription import ingest_prescription_file_tool
 
 
 def auto_tool(payload: dict[str, Any]) -> dict[str, Any]:
@@ -20,19 +19,13 @@ def auto_tool(payload: dict[str, Any]) -> dict[str, Any]:
         return {"error": "missing_update"}
 
     message = update.get("message") or update.get("edited_message") or {}
-    # File ingestion
+    # File ingestion: ask the user which type for MVP
     if "document" in message or "photo" in message:
-        out = ingest_prescription_file_tool({"update": update})
-        reply = (
-            "Got your prescription. I will parse it and set up reminders."
-            if not out.get("error")
-            else "Sorry, I couldn't process that file."
+        prompt = (
+            "Is this a pharmacy label (single medication) or a doctor's prescription "
+            "(multiple medications)? Reply with 'label' or 'prescription'."
         )
-        logger.info(
-            "auto_tool_route",
-            extra={"target": "ingest_prescription_file", "error": out.get("error")},
-        )
-        return {"tool": "ingest_prescription_file", "reply": reply, **out}
+        return {"tool": "ask_source_type", "reply": prompt}
 
     # Text handling
     text = message.get("text")

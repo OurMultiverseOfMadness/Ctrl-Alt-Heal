@@ -95,6 +95,25 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             reply = out.get("reply")
             if isinstance(reply, str) and reply:
                 _send_message(chat_id, reply, settings)
+            # If user replies 'label' or 'prescription', route accordingly
+            if isinstance(message.get("text"), str):
+                text_lower = str(message.get("text")).strip().lower()
+                if text_lower in {"label", "/label"}:
+                    res = agent.handle("ingest_prescription_file", {"update": update})
+                    confirm = (
+                        "Got your label. I will parse it and set up reminders."
+                        if not res.get("error")
+                        else "Sorry, I couldn't process that file."
+                    )
+                    _send_message(chat_id, confirm, settings)
+                elif text_lower in {"prescription", "/prescription"}:
+                    res = agent.handle("ingest_prescription_multi", {"update": update})
+                    confirm = (
+                        "Got your prescription. I will parse all medications."
+                        if not res.get("error")
+                        else "Sorry, I couldn't process that file."
+                    )
+                    _send_message(chat_id, confirm, settings)
     except Exception as exc:
         logger.exception("auto_route_error", extra={"error": str(exc)})
 
