@@ -277,7 +277,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     store.save_bundle(chat_id, bundle)
                 except Exception:
                     logger.exception("fhir_persist_error")
-                _send_message(chat_id, "Great! I will set up reminders next.", settings)
+                _send_message(chat_id, "Saved. I will set up reminders next.", settings)
                 clear_state(chat_id)
             elif text_lower in {"no", "/no"}:
                 _send_message(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
 from typing import Any
 
 import boto3
@@ -15,10 +16,12 @@ class FhirStore:
     def save_bundle(self, chat_id: int, bundle: dict[str, Any]) -> None:
         if self._table is None:
             raise RuntimeError("FHIR_TABLE_NAME not configured")
+        ts = datetime.now(UTC).isoformat()
         self._table.put_item(
             Item={
                 "pk": f"CHAT#{chat_id}",
-                "sk": "FHIR#BUNDLE",
+                "sk": f"FHIR#BUNDLE#{ts}",
                 "bundle": bundle,
+                "createdAt": ts,
             }
         )
