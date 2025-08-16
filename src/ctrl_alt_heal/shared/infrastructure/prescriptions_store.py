@@ -98,3 +98,15 @@ def get_prescription(chat_id: int, sk: str) -> dict[str, Any] | None:
     )
     item = resp.get("Item") if isinstance(resp, dict) else None
     return item if isinstance(item, dict) else None
+
+
+def set_prescription_schedule(
+    chat_id: int, sk: str, times_utc_hhmm: list[str], until_iso: str
+) -> None:
+    _ensure_table()
+    _table.update_item(  # type: ignore[union-attr]
+        Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+        UpdateExpression="SET #t = :t, #u = :u",
+        ExpressionAttributeNames={"#t": "scheduleTimes", "#u": "scheduleUntil"},
+        ExpressionAttributeValues={":t": times_utc_hhmm, ":u": until_iso},
+    )

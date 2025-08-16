@@ -54,3 +54,20 @@ def upsert_phone_for_telegram(telegram_user_id: int, phone: str) -> None:
         "attrs": current.get("attrs") or {},
     }
     _table.put_item(Item=item)  # type: ignore[union-attr]
+
+
+def upsert_timezone_for_telegram(telegram_user_id: int, timezone: str) -> None:
+    """Store user's IANA timezone in attrs.timezone."""
+    _ensure_table()
+    current = get_identity_by_telegram(telegram_user_id) or {}
+    attrs = current.get("attrs") or {}
+    if not isinstance(attrs, dict):
+        attrs = {}
+    attrs["timezone"] = timezone
+    item = {
+        "pk": f"TG#{telegram_user_id}",
+        "sk": "IDENTITY",
+        "phone": current.get("phone"),
+        "attrs": attrs,
+    }
+    _table.put_item(Item=item)  # type: ignore[union-attr]

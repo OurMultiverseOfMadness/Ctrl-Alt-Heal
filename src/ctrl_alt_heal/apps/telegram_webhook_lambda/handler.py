@@ -574,6 +574,92 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             )
                         except Exception:
                             logger.exception("active_next_error")
+                elif isinstance(data, str) and data.startswith("rx_remind_ok::"):
+                    # User accepted suggested times; create schedules
+                    try:
+                        _, sk, label = data.split("::", 2)
+                        times = [t.strip() for t in label.split(",") if t.strip()]
+                        from datetime import UTC, datetime, timedelta
+
+                        from ...shared.infrastructure.identities import (
+                            get_identity_by_telegram,
+                        )
+                        from ...shared.infrastructure.prescriptions_store import (
+                            set_prescription_schedule,
+                        )
+                        from ...shared.infrastructure.scheduler import (
+                            ReminderScheduler,
+                        )
+
+                        until = (datetime.now(UTC) + timedelta(days=30)).isoformat()
+                        ident = get_identity_by_telegram(cb_chat_id) or {}
+                        tz = (
+                            (ident.get("attrs") or {}).get("timezone")
+                            if isinstance(ident, dict)
+                            else None
+                        )
+                        tzname = str(tz) if isinstance(tz, str) and tz else "UTC"
+                        times_utc = (
+                            ReminderScheduler.local_times_to_utc(times, tzname)
+                            if tzname != "UTC"
+                            else times
+                        )
+                        set_prescription_schedule(cb_chat_id, sk, times, until)
+                        ReminderScheduler(settings.aws_region).create_cron_schedules(
+                            cb_chat_id, sk, times_utc, until
+                        )
+                        _send_message(
+                            cb_chat_id,
+                            "Reminders set. You can update by sending new times.",
+                            settings,
+                        )
+                    except Exception:
+                        logger.exception("rx_remind_ok_error")
+                elif isinstance(data, str) and data.startswith("rx_remind::"):
+                    sk = data.split("::", 1)[1]
+                    try:
+                        from ...shared.infrastructure.prescriptions_store import (
+                            get_prescription,
+                        )
+                        from ...shared.infrastructure.schedule_suggester import (
+                            suggest_times_from_text,
+                        )
+
+                        rx = get_prescription(cb_chat_id, sk)
+                        if not isinstance(rx, dict):
+                            _send_message(cb_chat_id, "Not found.", settings)
+                        else:
+                            freq_text = rx.get("frequencyText") or rx.get("dosageText")
+                            times, reason = suggest_times_from_text(
+                                str(freq_text) if isinstance(freq_text, str) else None
+                            )
+                            label = ", ".join(times)
+                            _send_message(
+                                cb_chat_id,
+                                (
+                                    "Suggested reminder times (UTC): "
+                                    f"{label} ({reason}).\n"
+                                    "Reply with times like 08:00, 20:00 or tap OK."
+                                ),
+                                settings,
+                                reply_markup={
+                                    "inline_keyboard": [
+                                        [
+                                            {
+                                                "text": "OK",
+                                                "callback_data": (
+                                                    f"rx_remind_ok::{sk}::{label}"
+                                                ),
+                                            }
+                                        ]
+                                    ]
+                                },
+                            )
+                            st = get_state(cb_chat_id)
+                            st["rx_remind_pending"] = {"sk": sk, "times": times}
+                            set_state(cb_chat_id, st)
+                    except Exception:
+                        logger.exception("rx_remind_error")
                 elif isinstance(data, str) and data.startswith("rx_stop::"):
                     # Stop a prescription by sk, then refresh first page of active RXs
                     sk = data.split("::", 1)[1]
@@ -869,9 +955,13 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             rows.append(
                                 [
                                     {
+                                        "text": "⏰ Remind",
+                                        "callback_data": f"rx_remind::{sk_val}",
+                                    },
+                                    {
                                         "text": "⏹ Stop",
                                         "callback_data": f"rx_stop::{sk_val}",
-                                    }
+                                    },
                                 ]
                             )
                     if st.get("rx_active_lek"):
@@ -1015,6 +1105,48 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 after2 = get_state(chat_id)
                 after2.pop("awaiting_fhir", None)
                 set_state(chat_id, after2)
+            elif state.get("rx_remind_pending") and has_text:
+                # User provided custom times, e.g. "08:00, 20:00"
+                try:
+                    from ...shared.infrastructure.prescriptions_store import (
+                        set_prescription_schedule,
+                    )
+                    from ...shared.infrastructure.schedule_suggester import (
+                        parse_times_user_input,
+                    )
+                    from ...shared.infrastructure.scheduler import ReminderScheduler
+
+                    p = state.get("rx_remind_pending") or {}
+                    sk = p.get("sk") if isinstance(p, dict) else None
+                    times = parse_times_user_input(str(message.get("text", "")))
+                    if not (isinstance(sk, str) and times):
+                        _send_message(
+                            chat_id,
+                            "Please provide times like 08:00, 20:00",
+                            settings,
+                        )
+                    else:
+                        # Default 30 days if no stock info yet
+                        from datetime import UTC, datetime, timedelta
+
+                        until = (datetime.now(UTC) + timedelta(days=30)).isoformat()
+                        set_prescription_schedule(int(chat_id), sk, times, until)
+                        ReminderScheduler(settings.aws_region).create_cron_schedules(
+                            int(chat_id), sk, times, until
+                        )
+                        _send_message(
+                            chat_id,
+                            (
+                                "Reminders set. You can update anytime by sending "
+                                "new times."
+                            ),
+                            settings,
+                        )
+                        after3 = get_state(chat_id)
+                        after3.pop("rx_remind_pending", None)
+                        set_state(chat_id, after3)
+                except Exception:
+                    logger.exception("rx_remind_custom_error")
             elif text_lower in {"no", "/no"}:
                 _send_message(
                     chat_id, "Okay. Please type corrections (dose/frequency).", settings
