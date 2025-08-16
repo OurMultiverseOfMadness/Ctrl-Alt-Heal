@@ -12,6 +12,7 @@ import boto3
 from ...agents.strands.agent import StrandsAgent
 from ...config.settings import Settings
 from ...contexts.prescriptions.application.use_cases.extract_prescription import (
+    materialize_prescriptions_from_bundle,
     to_fhir_bundle,
 )
 from ...interface.telegram.handlers.router import parse_command
@@ -242,7 +243,9 @@ def _handle_fhir_document(
         to_store = to_fhir_bundle(chat_id, parsed)
     try:
         store = FhirStore(settings.fhir_table_name)
-        store.save_bundle(chat_id, to_store)
+        sk = store.save_bundle(chat_id, to_store)
+        # materialize prescriptions for quick viewing
+        materialize_prescriptions_from_bundle(chat_id, to_store, source_bundle_sk=sk)
         _send_message(
             chat_id, "FHIR record saved. I will set up reminders next.", settings
         )
@@ -425,6 +428,30 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             "create your medication schedule."
                         ),
                         settings,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "📄 Use sample FHIR 1",
+                                        "callback_data": "fhir_sample_1",
+                                    },
+                                    {
+                                        "text": "📄 Use sample FHIR 2",
+                                        "callback_data": "fhir_sample_2",
+                                    },
+                                ],
+                                [
+                                    {
+                                        "text": "📄 Use sample FHIR 3",
+                                        "callback_data": "fhir_sample_3",
+                                    },
+                                    {
+                                        "text": "📄 Use sample FHIR 4",
+                                        "callback_data": "fhir_sample_4",
+                                    },
+                                ],
+                            ]
+                        },
                         reply_to_message_id=cb_message_id
                         if isinstance(cb_message_id, int)
                         else None,
@@ -604,6 +631,56 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     ),
                     settings,
                 )
+                return {"statusCode": 200, "body": "ok"}
+            if cmd == "history":
+                items = []
+                try:
+                    from ...shared.infrastructure.prescriptions_store import (
+                        list_prescriptions,
+                    )
+
+                    items = list_prescriptions(
+                        int(chat_id) if isinstance(chat_id, int) else 0
+                    )
+                except Exception:
+                    logger.exception("history_list_error")
+                if not items:
+                    _send_message(chat_id, "No prescriptions found.", settings)
+                else:
+                    lines: list[str] = []
+                    for it in items[:5]:
+                        lines.append(
+                            f"- {it.get('medicationName')}: "
+                            f"{it.get('dosageText') or ''}"
+                        )
+                    _send_message(
+                        chat_id, "Your prescriptions:\n" + "\n".join(lines), settings
+                    )
+                return {"statusCode": 200, "body": "ok"}
+            if cmd == "active":
+                items = []
+                try:
+                    from ...shared.infrastructure.prescriptions_store import (
+                        list_prescriptions,
+                    )
+
+                    items = list_prescriptions(
+                        int(chat_id) if isinstance(chat_id, int) else 0, status="active"
+                    )
+                except Exception:
+                    logger.exception("active_list_error")
+                if not items:
+                    _send_message(chat_id, "No active prescriptions.", settings)
+                else:
+                    lines: list[str] = []
+                    for it in items[:5]:
+                        lines.append(
+                            f"- {it.get('medicationName')}: "
+                            f"{it.get('dosageText') or ''}"
+                        )
+                    _send_message(
+                        chat_id, "Active prescriptions:\n" + "\n".join(lines), settings
+                    )
                 return {"statusCode": 200, "body": "ok"}
 
             # Control words: label / prescription / fhir
@@ -788,6 +865,40 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     )
                 # If plain text with no control/correction, route to chat
                 elif has_text and not text_lower.startswith("/"):
+                    # Simple NLU for "what are my active prescriptions?"
+                    tl = text_lower
+                    if "active" in tl and (
+                        "rx" in tl or "prescription" in tl or "med" in tl
+                    ):
+                        try:
+                            from ...shared.infrastructure.prescriptions_store import (
+                                list_prescriptions,
+                            )
+
+                            items = list_prescriptions(
+                                int(chat_id) if isinstance(chat_id, int) else 0,
+                                status="active",
+                            )
+                            if not items:
+                                _send_message(
+                                    chat_id, "No active prescriptions.", settings
+                                )
+                            else:
+                                lines = [
+                                    (
+                                        f"- {it.get('medicationName')}: "
+                                        f"{it.get('dosageText') or ''}"
+                                    )
+                                    for it in items[:5]
+                                ]
+                                _send_message(
+                                    chat_id,
+                                    "Active prescriptions:\n" + "\n".join(lines),
+                                    settings,
+                                )
+                            return {"statusCode": 200, "body": "ok"}
+                        except Exception:
+                            logger.exception("active_nlu_error")
                     out = agent.handle_sdk(
                         "chat", {"text": str(message.get("text", ""))}
                     )

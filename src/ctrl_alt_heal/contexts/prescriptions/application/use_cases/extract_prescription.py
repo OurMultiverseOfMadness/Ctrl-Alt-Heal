@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from src.ctrl_alt_heal.contexts.prescriptions.domain.prescription import Prescription
+from src.ctrl_alt_heal.shared.infrastructure.prescriptions_store import (
+    save_prescription,
+)
 
 
 @dataclass
@@ -74,3 +77,42 @@ def to_fhir_bundle(
 
     bundle = {"resourceType": "Bundle", "type": "collection", "entry": entries}
     return bundle
+
+
+def materialize_prescriptions_from_bundle(
+    chat_id: int, bundle: dict[str, Any], source_bundle_sk: str | None = None
+) -> None:
+    entries = bundle.get("entry") if isinstance(bundle, dict) else None
+    if not isinstance(entries, list):
+        return
+    for entry in entries:
+        res = entry.get("resource") if isinstance(entry, dict) else None
+        if not isinstance(res, dict):
+            continue
+        if res.get("resourceType") not in {"MedicationRequest", "MedicationStatement"}:
+            continue
+        name = ((res.get("medicationCodeableConcept") or {}).get("text")) or ""
+        di = res.get("dosageInstruction")
+        dosage_text = None
+        if isinstance(di, list) and di:
+            first = di[0]
+            if isinstance(first, dict):
+                dosage_text = first.get("text")
+        status = (
+            (res.get("status") or "active")
+            if isinstance(res.get("status"), str)
+            else "active"
+        )
+        authored_on = (
+            res.get("authoredOn") if isinstance(res.get("authoredOn"), str) else None
+        )
+        save_prescription(
+            chat_id=chat_id,
+            name=str(name),
+            dosage_text=str(dosage_text) if isinstance(dosage_text, str) else None,
+            frequency_text=None,
+            status=str(status),
+            source_bundle_sk=source_bundle_sk,
+            start_iso=authored_on,
+            extra={},
+        )

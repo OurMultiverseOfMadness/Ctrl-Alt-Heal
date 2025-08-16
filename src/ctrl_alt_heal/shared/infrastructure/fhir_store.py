@@ -13,15 +13,17 @@ class FhirStore:
         self._ddb = boto3.resource("dynamodb")
         self._table = self._ddb.Table(self._table_name) if self._table_name else None
 
-    def save_bundle(self, chat_id: int, bundle: dict[str, Any]) -> None:
+    def save_bundle(self, chat_id: int, bundle: dict[str, Any]) -> str:
         if self._table is None:
             raise RuntimeError("FHIR_TABLE_NAME not configured")
         ts = datetime.now(UTC).isoformat()
+        sk = f"FHIR#BUNDLE#{ts}"
         self._table.put_item(
             Item={
                 "pk": f"CHAT#{chat_id}",
-                "sk": f"FHIR#BUNDLE#{ts}",
+                "sk": sk,
                 "bundle": bundle,
                 "createdAt": ts,
             }
         )
+        return sk
