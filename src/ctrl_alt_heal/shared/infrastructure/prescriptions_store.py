@@ -79,3 +79,22 @@ def list_prescriptions(
         chat_id, status=status, limit=limit, last_evaluated_key=last_evaluated_key
     )
     return items
+
+
+def update_prescription_status(chat_id: int, sk: str, status: str) -> None:
+    _ensure_table()
+    _table.update_item(  # type: ignore[union-attr]
+        Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+        UpdateExpression="SET #s = :s",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":s": status},
+    )
+
+
+def get_prescription(chat_id: int, sk: str) -> dict[str, Any] | None:
+    _ensure_table()
+    resp = _table.get_item(  # type: ignore[union-attr]
+        Key={"pk": f"CHAT#{chat_id}", "sk": sk}
+    )
+    item = resp.get("Item") if isinstance(resp, dict) else None
+    return item if isinstance(item, dict) else None

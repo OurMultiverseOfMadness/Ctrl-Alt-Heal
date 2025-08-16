@@ -574,6 +574,18 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             )
                         except Exception:
                             logger.exception("active_next_error")
+                elif isinstance(data, str) and data.startswith("rx_stop::"):
+                    # Stop a prescription by sk
+                    sk = data.split("::", 1)[1]
+                    try:
+                        from ...shared.infrastructure.prescriptions_store import (
+                            update_prescription_status,
+                        )
+
+                        update_prescription_status(cb_chat_id, sk, "stopped")
+                        _send_message(cb_chat_id, "Prescription stopped.", settings)
+                    except Exception:
+                        logger.exception("rx_stop_error")
                 elif data == "set_source_label":
                     st = get_state(cb_chat_id)
                     file_update = st.get("last_file_update")
@@ -807,20 +819,28 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             f"- {it.get('medicationName')}: "
                             f"{it.get('dosageText') or ''}"
                         )
-                    reply_markup = (
-                        {
-                            "inline_keyboard": [
+                    rows: list[list[dict[str, str]]] = []
+                    for it in items[:5]:
+                        sk_val = it.get("sk")
+                        if isinstance(sk_val, str):
+                            rows.append(
                                 [
                                     {
-                                        "text": "Next ▶",
-                                        "callback_data": "rx_active_next",
+                                        "text": "⏹ Stop",
+                                        "callback_data": f"rx_stop::{sk_val}",
                                     }
                                 ]
+                            )
+                    if st.get("rx_active_lek"):
+                        rows.append(
+                            [
+                                {
+                                    "text": "Next ▶",
+                                    "callback_data": "rx_active_next",
+                                }
                             ]
-                        }
-                        if st.get("rx_active_lek")
-                        else {}
-                    )
+                        )
+                    reply_markup = {"inline_keyboard": rows} if rows else {}
                     _send_message(
                         chat_id,
                         "Active prescriptions:\n" + "\n".join(lines),
@@ -1038,10 +1058,26 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                     )
                                     for it in items[:5]
                                 ]
+                                rows: list[list[dict[str, str]]] = []
+                                for it in items[:5]:
+                                    sk_val = it.get("sk")
+                                    if isinstance(sk_val, str):
+                                        rows.append(
+                                            [
+                                                {
+                                                    "text": "⏹ Stop",
+                                                    "callback_data": (
+                                                        f"rx_stop::{sk_val}"
+                                                    ),
+                                                }
+                                            ]
+                                        )
+                                reply_markup = {"inline_keyboard": rows} if rows else {}
                                 _send_message(
                                     chat_id,
                                     "Active prescriptions:\n" + "\n".join(lines),
                                     settings,
+                                    reply_markup=reply_markup,
                                 )
                             return {"statusCode": 200, "body": "ok"}
                         except Exception:
