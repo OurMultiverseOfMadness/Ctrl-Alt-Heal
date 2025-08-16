@@ -470,7 +470,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     sample = SAMPLE_FHIR.get(str(data)) or {}
                     try:
                         store = FhirStore(settings.fhir_table_name)
-                        store.save_bundle(cb_chat_id, sample)
+                        sk = store.save_bundle(cb_chat_id, sample)
+                        # also materialize prescriptions for the sample bundle
+                        materialize_prescriptions_from_bundle(
+                            cb_chat_id, sample, source_bundle_sk=sk
+                        )
                         _send_message(
                             cb_chat_id,
                             "Sample FHIR saved. I will set up reminders next.",
@@ -715,8 +719,19 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 _send_message(
                     chat_id,
                     (
-                        "You can send prescriptions, ask questions, and schedule "
-                        "reminders.\nCommands: /start, /help"
+                        "Here’s what I can do:\n"
+                        "- Upload a label photo (single medicine) or a doctor’s "
+                        "prescription (multiple).\n"
+                        "- Upload a FHIR record from your hospital portal.\n"
+                        "- List your prescriptions and see what’s active.\n"
+                        "- Set up reminders (coming soon).\n\n"
+                        "Commands:\n"
+                        "/start — show the main menu\n"
+                        "/help — this help\n"
+                        "/history — recent prescriptions\n"
+                        "/active — active prescriptions\n\n"
+                        'Tip: You can also ask, e.g. "what are my active '
+                        'prescriptions?"'
                     ),
                     settings,
                 )
