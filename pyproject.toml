@@ -19,6 +19,9 @@ ignore_missing_imports = true
 namespace_packages = true
 explicit_package_bases = true
 
+[tool.ruff.lint.per-file-ignores]
+"tests/fixtures/**/*" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = [
   "tests",

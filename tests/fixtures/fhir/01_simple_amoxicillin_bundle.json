@@ -1,0 +1,31 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Amoxicillin 500 mg capsule" },
+        "subject": { "reference": "Patient/example" },
+        "authoredOn": "2025-08-13",
+        "dosageInstruction": [
+          {
+            "text": "Take 1 capsule (500 mg) by mouth three times daily for 7 days, after food.",
+            "timing": {
+              "repeat": {
+                "frequency": 3,
+                "period": 1,
+                "periodUnit": "d",
+                "boundsDuration": { "value": 7, "unit": "days" }
+              }
+            },
+            "route": { "text": "Oral" },
+            "additionalInstruction": [{ "text": "After food" }]
+          }
+        ]
+      }
+    }
+  ]
+}

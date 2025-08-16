@@ -1,0 +1,39 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Metformin 500 mg" },
+        "dosageInstruction": [
+          { "text": "Take 1 tablet twice a day with meals (breakfast and dinner)." }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Atorvastatin 20 mg" },
+        "dosageInstruction": [
+          { "text": "Take 1 tablet once daily at night." }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Amoxicillin-Clavulanate 875/125 mg" },
+        "dosageInstruction": [
+          { "text": "Take 1 tablet every 12 hours for 10 days. Take with food. Avoid alcohol." }
+        ]
+      }
+    }
+  ]
+}

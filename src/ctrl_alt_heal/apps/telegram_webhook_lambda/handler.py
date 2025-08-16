@@ -16,7 +16,11 @@ from ...contexts.prescriptions.application.use_cases.extract_prescription import
 )
 from ...interface.telegram.handlers.router import parse_command
 from ...shared.infrastructure.fhir_store import FhirStore
-from ...shared.infrastructure.identities import link_telegram_user
+from ...shared.infrastructure.identities import (
+    get_identity_by_telegram,
+    link_telegram_user,
+    upsert_phone_for_telegram,
+)
 from ...shared.infrastructure.logger import get_logger
 from ...shared.infrastructure.state_store import clear_state, get_state, set_state
 
@@ -84,6 +88,141 @@ def _answer_callback_query(callback_query_id: str, settings: Settings) -> None:
         pass
 
 
+def _send_contact_request(chat_id: int, settings: Settings) -> None:
+    token = _get_bot_token(settings)
+    url = f"{settings.telegram_api_url}/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": (
+            "To personalize your reminders, please share your phone number. "
+            "Tap the button below."
+        ),
+        "reply_markup": {
+            "keyboard": [[{"text": "Share phone number", "request_contact": True}]],
+            "resize_keyboard": True,
+            "one_time_keyboard": True,
+        },
+    }
+    payload_bytes = _json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=payload_bytes, headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except urllib.error.URLError:
+        pass
+
+
+def _ensure_phone(
+    telegram_user_id: int | None, chat_id: int | None, settings: Settings
+) -> bool:
+    if not isinstance(telegram_user_id, int) or not isinstance(chat_id, int):
+        return False
+    try:
+        ident = get_identity_by_telegram(telegram_user_id)
+        phone = (ident or {}).get("phone") if ident else None
+        if not phone:
+            _send_contact_request(chat_id, settings)
+            return False
+        return True
+    except Exception:
+        return False
+
+
+# Minimal in-memory FHIR samples for testing via buttons
+SAMPLE_FHIR: dict[str, dict[str, object]] = {
+    "fhir_sample_1": {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+            {
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "status": "active",
+                    "intent": "order",
+                    "medicationCodeableConcept": {"text": "Amoxicillin 500 mg"},
+                    "dosageInstruction": [
+                        {
+                            "text": (
+                                "Take 1 capsule by mouth three times daily for 7 days."
+                            )
+                        }
+                    ],
+                }
+            }
+        ],
+    },
+    "fhir_sample_2": {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+            {
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "status": "active",
+                    "intent": "order",
+                    "medicationCodeableConcept": {"text": "Metformin 500 mg"},
+                    "dosageInstruction": [
+                        {"text": "Take 1 tablet twice daily with meals."}
+                    ],
+                }
+            },
+            {
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "status": "active",
+                    "intent": "order",
+                    "medicationCodeableConcept": {"text": "Atorvastatin 20 mg"},
+                    "dosageInstruction": [
+                        {"text": "Take 1 tablet at night once daily."}
+                    ],
+                }
+            },
+        ],
+    },
+    "fhir_sample_3": {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+            {
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "status": "active",
+                    "intent": "order",
+                    "medicationCodeableConcept": {"text": "Albuterol Inhaler"},
+                    "dosageInstruction": [
+                        {"text": "Inhale 2 puffs every 4-6 hours as needed."}
+                    ],
+                }
+            }
+        ],
+    },
+    "fhir_sample_4": {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+            {
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "status": "active",
+                    "intent": "order",
+                    "medicationCodeableConcept": {"text": "Levothyroxine 75 mcg"},
+                    "dosageInstruction": [
+                        {
+                            "text": (
+                                "Take 1 tablet every morning on empty stomach "
+                                "for 90 days."
+                            )
+                        }
+                    ],
+                }
+            }
+        ],
+    },
+}
+
+
 def _handle_fhir_document(
     chat_id: int, update: dict[str, Any], settings: Settings
 ) -> None:
@@ -101,9 +240,16 @@ def _handle_fhir_document(
         to_store = parsed
     else:
         to_store = to_fhir_bundle(chat_id, parsed)
-    store = FhirStore(settings.fhir_table_name)
-    store.save_bundle(chat_id, to_store)
-    _send_message(chat_id, "FHIR record saved. I will set up reminders next.", settings)
+    try:
+        store = FhirStore(settings.fhir_table_name)
+        store.save_bundle(chat_id, to_store)
+        _send_message(
+            chat_id, "FHIR record saved. I will set up reminders next.", settings
+        )
+    except Exception:
+        logger = get_logger(__name__)
+        logger.exception("fhir_save_error")
+        _send_message(chat_id, "Sorry, failed to save FHIR data.", settings)
 
 
 def _compose_single_summary(res: dict[str, Any]) -> str:
@@ -213,6 +359,21 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         chat = message.get("chat") or {}
         chat_id = chat.get("id")
         logger.info("update_received")
+        # Handle contact share for phone number linkage
+        contact = message.get("contact")
+        if isinstance(contact, dict):
+            phone = contact.get("phone_number")
+            from_user = message.get("from") or {}
+            uid = from_user.get("id") if isinstance(from_user, dict) else None
+            if isinstance(uid, int) and isinstance(phone, str) and phone:
+                try:
+                    upsert_phone_for_telegram(uid, phone)
+                    if isinstance(chat_id, int):
+                        _send_message(
+                            chat_id, "Thank you! Phone number linked.", settings
+                        )
+                except Exception:
+                    logger.exception("identity_phone_link_error")
 
     # Handle callback buttons (inline keyboard)
     if isinstance(callback_query, dict):
@@ -250,6 +411,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         else None,
                     )
                 elif data == "upload_fhir":
+                    cb_from = callback_query.get("from") or {}
+                    uid = cb_from.get("id") if isinstance(cb_from, dict) else None
+                    if not _ensure_phone(uid, cb_chat_id, settings):
+                        return {"statusCode": 200, "body": "ok"}
                     st = get_state(cb_chat_id)
                     st["awaiting_fhir"] = True
                     set_state(cb_chat_id, st)
@@ -264,6 +429,31 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         if isinstance(cb_message_id, int)
                         else None,
                     )
+                elif data in {
+                    "fhir_sample_1",
+                    "fhir_sample_2",
+                    "fhir_sample_3",
+                    "fhir_sample_4",
+                }:
+                    # Require phone before proceeding
+                    cb_from = callback_query.get("from") or {}
+                    uid = cb_from.get("id") if isinstance(cb_from, dict) else None
+                    if not _ensure_phone(uid, cb_chat_id, settings):
+                        return {"statusCode": 200, "body": "ok"}
+                    sample = SAMPLE_FHIR.get(str(data)) or {}
+                    try:
+                        store = FhirStore(settings.fhir_table_name)
+                        store.save_bundle(cb_chat_id, sample)
+                        _send_message(
+                            cb_chat_id,
+                            "Sample FHIR saved. I will set up reminders next.",
+                            settings,
+                        )
+                    except Exception:
+                        logger.exception("fhir_sample_save_error")
+                        _send_message(
+                            cb_chat_id, "Sorry, failed to save sample.", settings
+                        )
                 elif data == "set_source_label":
                     st = get_state(cb_chat_id)
                     file_update = st.get("last_file_update")
@@ -353,8 +543,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             # Link identity (best-effort)
             try:
                 from_user = message.get("from") or {}
-                if isinstance(from_user, dict) and isinstance(from_user.get("id"), int):
-                    link_telegram_user(int(from_user.get("id")), phone=None, attrs={})
+                uid = from_user.get("id") if isinstance(from_user, dict) else None
+                if isinstance(uid, int):
+                    link_telegram_user(uid, phone=None, attrs={})
             except Exception:
                 pass
 
@@ -392,6 +583,17 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         ]
                     },
                 )
+                # If identity lacks phone, ask for contact share
+                try:
+                    from_user = message.get("from") or {}
+                    uid = from_user.get("id") if isinstance(from_user, dict) else None
+                    if isinstance(uid, int):
+                        ident = get_identity_by_telegram(uid)
+                        phone = (ident or {}).get("phone") if ident else None
+                        if not phone:
+                            _send_contact_request(chat_id, settings)
+                except Exception:
+                    pass
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "help":
                 _send_message(
@@ -518,11 +720,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 clear_state(chat_id)
             elif state.get("awaiting_fhir") and (has_doc or has_photo):
                 try:
-                    _handle_fhir_document(chat_id, update, settings)
+                    _handle_fhir_document(int(chat_id), update, settings)
                 except Exception:
                     logger.exception("fhir_upload_error")
                     _send_message(
-                        chat_id, "Sorry, I couldn't read that file.", settings
+                        int(chat_id), "Sorry, I couldn't read that file.", settings
                     )
                 after2 = get_state(chat_id)
                 after2.pop("awaiting_fhir", None)
@@ -563,7 +765,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 # If a file arrived without text, prompt classification
                 if (has_doc or has_photo) and not has_text:
                     _send_message(
-                        chat_id,
+                        int(chat_id),
                         (
                             "Is this a pharmacy label (single) or a doctor's "
                             "prescription (multiple)?"
@@ -592,7 +794,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     reply = (
                         out.get("reply") or "How can I help with your recovery today?"
                     )
-                    _send_message(chat_id, str(reply), settings)
+                    _send_message(int(chat_id), str(reply), settings)
             # Do not send any further replies in this invocation; suppress fallback
             return {"statusCode": 200, "body": "ok"}
     except Exception:
@@ -602,7 +804,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     cmd, _args = parse_command(update)
     if cmd == "start":
         _send_message(
-            chat_id,
+            int(chat_id) if isinstance(chat_id, int) else 0,
             (
                 "Hi! I’m your recovery companion. I’ll help you follow your "
                 "medications on time and keep things simple.\n\n"
@@ -624,6 +826,26 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         },
                     ],
                     [{"text": "📄 Upload FHIR record", "callback_data": "upload_fhir"}],
+                    [
+                        {
+                            "text": "📄 Use sample FHIR 1",
+                            "callback_data": "fhir_sample_1",
+                        },
+                        {
+                            "text": "📄 Use sample FHIR 2",
+                            "callback_data": "fhir_sample_2",
+                        },
+                    ],
+                    [
+                        {
+                            "text": "📄 Use sample FHIR 3",
+                            "callback_data": "fhir_sample_3",
+                        },
+                        {
+                            "text": "📄 Use sample FHIR 4",
+                            "callback_data": "fhir_sample_4",
+                        },
+                    ],
                 ]
             },
         )
@@ -632,7 +854,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     # Control words include FHIR
     if text_lower in {"fhir", "/fhir"}:
         _send_message(
-            chat_id,
+            int(chat_id) if isinstance(chat_id, int) else 0,
             (
                 "Please send your FHIR JSON file (export from your hospital "
                 "portal). I will read it and set up reminders for you."
@@ -643,7 +865,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
     # When a document is received with intent FHIR
     if has_doc and text_lower in {"fhir", "/fhir"}:
-        _handle_fhir_document(chat_id, update, settings)
+        _handle_fhir_document(
+            int(chat_id) if isinstance(chat_id, int) else 0, update, settings
+        )
         return {"statusCode": 200, "body": "ok"}
 
     # Fallback suppressed to avoid duplicate replies during control flows

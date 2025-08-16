@@ -32,3 +32,15 @@ def get_identity_by_telegram(telegram_user_id: int) -> dict[str, Any] | None:
     _ensure_table()
     resp = _table.get_item(Key={"pk": f"TG#{telegram_user_id}", "sk": "IDENTITY"})  # type: ignore[union-attr]
     return resp.get("Item") if resp.get("Item") else None
+
+
+def upsert_phone_for_telegram(telegram_user_id: int, phone: str) -> None:
+    _ensure_table()
+    current = get_identity_by_telegram(telegram_user_id) or {}
+    item = {
+        "pk": f"TG#{telegram_user_id}",
+        "sk": "IDENTITY",
+        "phone": phone,
+        "attrs": current.get("attrs") or {},
+    }
+    _table.put_item(Item=item)  # type: ignore[union-attr]

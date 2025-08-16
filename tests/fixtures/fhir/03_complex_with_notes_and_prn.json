@@ -1,0 +1,50 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Albuterol Inhaler 90 mcg" },
+        "dosageInstruction": [
+          {
+            "text": "Inhale 2 puffs every 4-6 hours as needed for wheeze.",
+            "asNeededBoolean": true
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Prednisone 10 mg" },
+        "dosageInstruction": [
+          {
+            "text": "Take 3 tablets daily for 3 days, then 2 tablets daily for 3 days, then 1 tablet daily for 3 days.",
+            "patientInstruction": "Taper as instructed. Take in the morning."
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Warfarin 5 mg" },
+        "dosageInstruction": [
+          {
+            "text": "Take 1 tablet daily. Avoid NSAIDs. Check INR weekly.",
+            "additionalInstruction": [
+              { "text": "Avoid spinach and kale binge." }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

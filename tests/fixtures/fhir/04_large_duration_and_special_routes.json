@@ -1,0 +1,35 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Insulin Glargine 100 units/mL" },
+        "dosageInstruction": [
+          {
+            "text": "Inject 20 units subcutaneously once nightly.",
+            "route": { "text": "Subcutaneous" }
+          }
+        ]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": { "text": "Levothyroxine 75 mcg" },
+        "dosageInstruction": [
+          {
+            "text": "Take 1 tablet every morning on an empty stomach for 90 days.",
+            "timing": {"repeat": {"frequency": 1, "period": 1, "periodUnit": "d", "boundsDuration": {"value": 90, "unit": "days"}}},
+            "additionalInstruction": [{"text": "Do not take with calcium/iron within 4 hours."}]
+          }
+        ]
+      }
+    }
+  ]
+}
