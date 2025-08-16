@@ -41,10 +41,21 @@ def _get_bot_token(settings: Settings) -> str:
     return token
 
 
-def _send_message(chat_id: int, text: str, settings: Settings) -> None:
+def _send_message(
+    chat_id: int,
+    text: str,
+    settings: Settings,
+    reply_markup: dict[str, Any] | None = None,
+    reply_to_message_id: int | None = None,
+) -> None:
     token = _get_bot_token(settings)
     url = f"{settings.telegram_api_url}/bot{token}/sendMessage"
-    payload_bytes = _json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
+    payload: dict[str, Any] = {"chat_id": chat_id, "text": text}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    if reply_to_message_id is not None:
+        payload["reply_to_message_id"] = reply_to_message_id
+    payload_bytes = _json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url, data=payload_bytes, headers={"Content-Type": "application/json"}
     )
@@ -53,6 +64,22 @@ def _send_message(chat_id: int, text: str, settings: Settings) -> None:
             pass
     except urllib.error.URLError:
         # Avoid failing webhook on send errors
+        pass
+
+
+def _answer_callback_query(callback_query_id: str, settings: Settings) -> None:
+    token = _get_bot_token(settings)
+    url = f"{settings.telegram_api_url}/bot{token}/answerCallbackQuery"
+    payload_bytes = _json.dumps({"callback_query_id": callback_query_id}).encode(
+        "utf-8"
+    )
+    req = urllib.request.Request(
+        url, data=payload_bytes, headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except urllib.error.URLError:
         pass
 
 
@@ -158,10 +185,113 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
     chat_id: int | None = None
     message = update.get("message") or update.get("edited_message")
+    callback_query = update.get("callback_query")
     if message and isinstance(message, dict):
         chat = message.get("chat") or {}
         chat_id = chat.get("id")
         logger.info("update_received")
+
+    # Handle callback buttons (inline keyboard)
+    if isinstance(callback_query, dict):
+        try:
+            data = callback_query.get("data")
+            cb_msg = callback_query.get("message") or {}
+            chat = (cb_msg.get("chat") or {}) if isinstance(cb_msg, dict) else {}
+            cb_chat_id = chat.get("id")
+            cb_message_id = (
+                cb_msg.get("message_id") if isinstance(cb_msg, dict) else None
+            )
+            if isinstance(cb_chat_id, int):
+                if data == "confirm_yes":
+                    st = get_state(cb_chat_id)
+                    extraction = st.get("last_extraction")
+                    try:
+                        bundle = to_fhir_bundle(
+                            cb_chat_id, extraction if extraction else {}
+                        )
+                        store = FhirStore(settings.fhir_table_name)
+                        store.save_bundle(cb_chat_id, bundle)
+                    except Exception:
+                        logger.exception("fhir_persist_error")
+                    _send_message(
+                        cb_chat_id, "Saved. I will set up reminders next.", settings
+                    )
+                    clear_state(cb_chat_id)
+                elif data == "confirm_no":
+                    _send_message(
+                        cb_chat_id,
+                        "Okay. Please type corrections (dose/frequency).",
+                        settings,
+                        reply_to_message_id=cb_message_id
+                        if isinstance(cb_message_id, int)
+                        else None,
+                    )
+                elif data == "set_source_label":
+                    st = get_state(cb_chat_id)
+                    file_update = st.get("last_file_update")
+                    if isinstance(file_update, dict):
+                        set_state(
+                            cb_chat_id,
+                            {"pending_correction": True, "source_type": "label"},
+                        )
+                        agent = StrandsAgent.default()
+                        res = agent.handle_sdk(
+                            "ingest_prescription_file", {"update": file_update}
+                        )
+                        if res.get("error"):
+                            _send_message(
+                                cb_chat_id,
+                                "Sorry, I couldn't process that file.",
+                                settings,
+                            )
+                        else:
+                            summary = _compose_single_summary(res)
+                            _send_message(cb_chat_id, summary, settings)
+                            after = get_state(cb_chat_id)
+                            after.pop("last_file_update", None)
+                            after["last_extraction"] = res.get("extraction")
+                            set_state(cb_chat_id, after)
+                    else:
+                        _send_message(
+                            cb_chat_id, "Please send the label photo first.", settings
+                        )
+                elif data == "set_source_prescription":
+                    st = get_state(cb_chat_id)
+                    file_update = st.get("last_file_update")
+                    if isinstance(file_update, dict):
+                        set_state(
+                            cb_chat_id,
+                            {"pending_correction": True, "source_type": "prescription"},
+                        )
+                        agent = StrandsAgent.default()
+                        res = agent.handle_sdk(
+                            "ingest_prescription_multi", {"update": file_update}
+                        )
+                        if res.get("error"):
+                            _send_message(
+                                cb_chat_id,
+                                "Sorry, I couldn't process that file.",
+                                settings,
+                            )
+                        else:
+                            summary = _compose_multi_summary(res)
+                            _send_message(cb_chat_id, summary, settings)
+                            after = get_state(cb_chat_id)
+                            after.pop("last_file_update", None)
+                            after["last_extraction"] = {"medications": res.get("items")}
+                            set_state(cb_chat_id, after)
+                    else:
+                        _send_message(
+                            cb_chat_id,
+                            "Please send the prescription image first.",
+                            settings,
+                        )
+            cb_id = callback_query.get("id")
+            if isinstance(cb_id, str):
+                _answer_callback_query(cb_id, settings)
+        except Exception:
+            logger.exception("auto_route_error")
+        return {"statusCode": 200, "body": "ok"}
 
     # Prefer control-word handling and file-memory before generic routing
     try:
@@ -189,11 +319,23 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     chat_id,
                     (
                         "Welcome! Send a photo or PDF of your prescription to begin.\n"
-                        "If it's a pharmacy label (single), reply 'label'.\n"
-                        "If it's a doctor's prescription (multiple), reply "
-                        "'prescription'."
+                        "Choose one:"
                     ),
                     settings,
+                    reply_markup={
+                        "inline_keyboard": [
+                            [
+                                {
+                                    "text": "📷 Label (single)",
+                                    "callback_data": "set_source_label",
+                                },
+                                {
+                                    "text": "📝 Prescription (multi)",
+                                    "callback_data": "set_source_prescription",
+                                },
+                            ]
+                        ]
+                    },
                 )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "help":
@@ -229,7 +371,22 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     )
                 else:
                     summary = _compose_single_summary(res)
-                    _send_message(chat_id, summary, settings)
+                    _send_message(
+                        chat_id,
+                        summary,
+                        settings,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {"text": "✅ Yes", "callback_data": "confirm_yes"},
+                                    {
+                                        "text": "✏️ No, correct",
+                                        "callback_data": "confirm_no",
+                                    },
+                                ]
+                            ]
+                        },
+                    )
                     # Save last extraction for commit on 'yes'
                     st = get_state(chat_id)
                     st["last_extraction"] = res.get("extraction")
@@ -260,7 +417,22 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     )
                 else:
                     summary = _compose_multi_summary(res)
-                    _send_message(chat_id, summary, settings)
+                    _send_message(
+                        chat_id,
+                        summary,
+                        settings,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {"text": "✅ Yes", "callback_data": "confirm_yes"},
+                                    {
+                                        "text": "✏️ No, correct",
+                                        "callback_data": "confirm_no",
+                                    },
+                                ]
+                            ]
+                        },
+                    )
                     st = get_state(chat_id)
                     st["last_extraction"] = {"medications": res.get("items")}
                     set_state(chat_id, st)
@@ -318,9 +490,23 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         chat_id,
                         (
                             "Is this a pharmacy label (single) or a doctor's "
-                            "prescription (multiple)? Reply 'label' or 'prescription'."
+                            "prescription (multiple)?"
                         ),
                         settings,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "📷 Label (single)",
+                                        "callback_data": "set_source_label",
+                                    },
+                                    {
+                                        "text": "📝 Prescription (multi)",
+                                        "callback_data": "set_source_prescription",
+                                    },
+                                ]
+                            ]
+                        },
                     )
                 # If plain text with no control/correction, route to chat
                 elif has_text and not text_lower.startswith("/"):
