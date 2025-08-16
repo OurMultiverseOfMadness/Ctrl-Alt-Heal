@@ -16,6 +16,7 @@ from ...contexts.prescriptions.application.use_cases.extract_prescription import
 )
 from ...interface.telegram.handlers.router import parse_command
 from ...shared.infrastructure.fhir_store import FhirStore
+from ...shared.infrastructure.identities import link_telegram_user
 from ...shared.infrastructure.logger import get_logger
 from ...shared.infrastructure.state_store import clear_state, get_state, set_state
 
@@ -81,6 +82,28 @@ def _answer_callback_query(callback_query_id: str, settings: Settings) -> None:
             pass
     except urllib.error.URLError:
         pass
+
+
+def _handle_fhir_document(
+    chat_id: int, update: dict[str, Any], settings: Settings
+) -> None:
+    s3 = boto3.client("s3")
+    from ...interface.telegram.download import download_and_store_telegram_file
+
+    loc = download_and_store_telegram_file(update, settings)
+    obj = s3.get_object(Bucket=loc.s3_bucket, Key=loc.s3_key)
+    data_bytes: bytes = obj["Body"].read()
+    try:
+        parsed = json.loads(data_bytes.decode("utf-8"))
+    except Exception:
+        parsed = {}
+    if isinstance(parsed, dict) and parsed.get("resourceType") == "Bundle":
+        to_store = parsed
+    else:
+        to_store = to_fhir_bundle(chat_id, parsed)
+    store = FhirStore(settings.fhir_table_name)
+    store.save_bundle(chat_id, to_store)
+    _send_message(chat_id, "FHIR record saved. I will set up reminders next.", settings)
 
 
 def _compose_single_summary(res: dict[str, Any]) -> str:
@@ -226,6 +249,21 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         if isinstance(cb_message_id, int)
                         else None,
                     )
+                elif data == "upload_fhir":
+                    st = get_state(cb_chat_id)
+                    st["awaiting_fhir"] = True
+                    set_state(cb_chat_id, st)
+                    _send_message(
+                        cb_chat_id,
+                        (
+                            "Please attach the FHIR JSON file here. I’ll read it and "
+                            "create your medication schedule."
+                        ),
+                        settings,
+                        reply_to_message_id=cb_message_id
+                        if isinstance(cb_message_id, int)
+                        else None,
+                    )
                 elif data == "set_source_label":
                     st = get_state(cb_chat_id)
                     file_update = st.get("last_file_update")
@@ -312,14 +350,25 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             )
             state = get_state(chat_id)
 
+            # Link identity (best-effort)
+            try:
+                from_user = message.get("from") or {}
+                if isinstance(from_user, dict) and isinstance(from_user.get("id"), int):
+                    link_telegram_user(int(from_user.get("id")), phone=None, attrs={})
+            except Exception:
+                pass
+
             # Slash command handling (e.g., /start, /help)
             cmd, _args = parse_command(update)
             if cmd == "start":
                 _send_message(
                     chat_id,
                     (
-                        "Welcome! Send a photo or PDF of your prescription to begin.\n"
-                        "Choose one:"
+                        "Hi! I’m your recovery companion. I’ll help you follow your "
+                        "medications on time and keep things simple.\n\n"
+                        "Would you like to upload a prescription now? You can send a "
+                        "photo of a label or prescription, or upload a FHIR record "
+                        "from your hospital if you have one."
                     ),
                     settings,
                     reply_markup={
@@ -333,7 +382,13 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                     "text": "📝 Prescription (multi)",
                                     "callback_data": "set_source_prescription",
                                 },
-                            ]
+                            ],
+                            [
+                                {
+                                    "text": "📄 Upload FHIR record",
+                                    "callback_data": "upload_fhir",
+                                }
+                            ],
                         ]
                     },
                 )
@@ -349,7 +404,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 )
                 return {"statusCode": 200, "body": "ok"}
 
-            # Control words: label / prescription
+            # Control words: label / prescription / fhir
             if text_lower in {"label", "/label"}:
                 logger.info("control_label")
                 file_update = (
@@ -439,6 +494,16 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 after = get_state(chat_id)
                 after.pop("last_file_update", None)
                 set_state(chat_id, after)
+            elif text_lower in {"fhir", "/fhir"}:
+                _send_message(
+                    chat_id,
+                    (
+                        "Please send your FHIR JSON file (export from your hospital "
+                        "portal). I will read it and set up reminders for you."
+                    ),
+                    settings,
+                )
+                return {"statusCode": 200, "body": "ok"}
             elif text_lower in {"yes", "/yes"}:
                 # Persist FHIR bundle
                 st = get_state(chat_id)
@@ -451,6 +516,17 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     logger.exception("fhir_persist_error")
                 _send_message(chat_id, "Saved. I will set up reminders next.", settings)
                 clear_state(chat_id)
+            elif state.get("awaiting_fhir") and (has_doc or has_photo):
+                try:
+                    _handle_fhir_document(chat_id, update, settings)
+                except Exception:
+                    logger.exception("fhir_upload_error")
+                    _send_message(
+                        chat_id, "Sorry, I couldn't read that file.", settings
+                    )
+                after2 = get_state(chat_id)
+                after2.pop("awaiting_fhir", None)
+                set_state(chat_id, after2)
             elif text_lower in {"no", "/no"}:
                 _send_message(
                     chat_id, "Okay. Please type corrections (dose/frequency).", settings
@@ -521,6 +597,54 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return {"statusCode": 200, "body": "ok"}
     except Exception:
         logger.exception("auto_route_error")
+
+    # Slash commands and warm greeting
+    cmd, _args = parse_command(update)
+    if cmd == "start":
+        _send_message(
+            chat_id,
+            (
+                "Hi! I’m your recovery companion. I’ll help you follow your "
+                "medications on time and keep things simple.\n\n"
+                "Would you like to upload a prescription now? You can send a "
+                "photo of a label or prescription, or upload a FHIR record from "
+                "your hospital if you have one."
+            ),
+            settings,
+            reply_markup={
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "📷 Label (single)",
+                            "callback_data": "set_source_label",
+                        },
+                        {
+                            "text": "📝 Prescription (multi)",
+                            "callback_data": "set_source_prescription",
+                        },
+                    ],
+                    [{"text": "📄 Upload FHIR record", "callback_data": "upload_fhir"}],
+                ]
+            },
+        )
+        return {"statusCode": 200, "body": "ok"}
+
+    # Control words include FHIR
+    if text_lower in {"fhir", "/fhir"}:
+        _send_message(
+            chat_id,
+            (
+                "Please send your FHIR JSON file (export from your hospital "
+                "portal). I will read it and set up reminders for you."
+            ),
+            settings,
+        )
+        return {"statusCode": 200, "body": "ok"}
+
+    # When a document is received with intent FHIR
+    if has_doc and text_lower in {"fhir", "/fhir"}:
+        _handle_fhir_document(chat_id, update, settings)
+        return {"statusCode": 200, "body": "ok"}
 
     # Fallback suppressed to avoid duplicate replies during control flows
 
