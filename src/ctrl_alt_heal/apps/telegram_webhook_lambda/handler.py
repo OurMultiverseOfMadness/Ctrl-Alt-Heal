@@ -481,6 +481,95 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         _send_message(
                             cb_chat_id, "Sorry, failed to save sample.", settings
                         )
+                elif data == "rx_history_next":
+                    st = get_state(cb_chat_id)
+                    lek = st.get("rx_history_lek")
+                    if lek:
+                        try:
+                            from ...shared.infrastructure.prescriptions_store import (
+                                list_prescriptions_page,
+                            )
+
+                            items, next_lek = list_prescriptions_page(
+                                cb_chat_id, limit=5, last_evaluated_key=lek
+                            )
+                            st["rx_history_lek"] = next_lek
+                            set_state(cb_chat_id, st)
+                            lines = [
+                                (
+                                    f"- {it.get('medicationName')}: "
+                                    f"{it.get('dosageText') or ''}"
+                                )
+                                for it in items
+                            ]
+                            markup = (
+                                {
+                                    "inline_keyboard": [
+                                        [
+                                            {
+                                                "text": "Next ▶",
+                                                "callback_data": "rx_history_next",
+                                            }
+                                        ]
+                                    ]
+                                }
+                                if next_lek
+                                else {}
+                            )
+                            _send_message(
+                                cb_chat_id,
+                                "Your prescriptions (more):\n" + "\n".join(lines),
+                                settings,
+                                reply_markup=markup,
+                            )
+                        except Exception:
+                            logger.exception("history_next_error")
+                elif data == "rx_active_next":
+                    st = get_state(cb_chat_id)
+                    lek = st.get("rx_active_lek")
+                    if lek:
+                        try:
+                            from ...shared.infrastructure.prescriptions_store import (
+                                list_prescriptions_page,
+                            )
+
+                            items, next_lek = list_prescriptions_page(
+                                cb_chat_id,
+                                status="active",
+                                limit=5,
+                                last_evaluated_key=lek,
+                            )
+                            st["rx_active_lek"] = next_lek
+                            set_state(cb_chat_id, st)
+                            lines = [
+                                (
+                                    f"- {it.get('medicationName')}: "
+                                    f"{it.get('dosageText') or ''}"
+                                )
+                                for it in items
+                            ]
+                            markup = (
+                                {
+                                    "inline_keyboard": [
+                                        [
+                                            {
+                                                "text": "Next ▶",
+                                                "callback_data": "rx_active_next",
+                                            }
+                                        ]
+                                    ]
+                                }
+                                if next_lek
+                                else {}
+                            )
+                            _send_message(
+                                cb_chat_id,
+                                "Active prescriptions (more):\n" + "\n".join(lines),
+                                settings,
+                                reply_markup=markup,
+                            )
+                        except Exception:
+                            logger.exception("active_next_error")
                 elif data == "set_source_label":
                     st = get_state(cb_chat_id)
                     file_update = st.get("last_file_update")
@@ -636,12 +725,15 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 items = []
                 try:
                     from ...shared.infrastructure.prescriptions_store import (
-                        list_prescriptions,
+                        list_prescriptions_page,
                     )
 
-                    items = list_prescriptions(
-                        int(chat_id) if isinstance(chat_id, int) else 0
+                    items, lek = list_prescriptions_page(
+                        int(chat_id) if isinstance(chat_id, int) else 0, limit=5
                     )
+                    st = get_state(chat_id)
+                    st["rx_history_lek"] = lek
+                    set_state(chat_id, st)
                 except Exception:
                     logger.exception("history_list_error")
                 if not items:
@@ -653,20 +745,42 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             f"- {it.get('medicationName')}: "
                             f"{it.get('dosageText') or ''}"
                         )
+                    reply_markup = (
+                        {
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "Next ▶",
+                                        "callback_data": "rx_history_next",
+                                    }
+                                ]
+                            ]
+                        }
+                        if st.get("rx_history_lek")
+                        else {}
+                    )
                     _send_message(
-                        chat_id, "Your prescriptions:\n" + "\n".join(lines), settings
+                        chat_id,
+                        "Your prescriptions:\n" + "\n".join(lines),
+                        settings,
+                        reply_markup=reply_markup,
                     )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "active":
                 items = []
                 try:
                     from ...shared.infrastructure.prescriptions_store import (
-                        list_prescriptions,
+                        list_prescriptions_page,
                     )
 
-                    items = list_prescriptions(
-                        int(chat_id) if isinstance(chat_id, int) else 0, status="active"
+                    items, lek = list_prescriptions_page(
+                        int(chat_id) if isinstance(chat_id, int) else 0,
+                        status="active",
+                        limit=5,
                     )
+                    st = get_state(chat_id)
+                    st["rx_active_lek"] = lek
+                    set_state(chat_id, st)
                 except Exception:
                     logger.exception("active_list_error")
                 if not items:
@@ -678,8 +792,25 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             f"- {it.get('medicationName')}: "
                             f"{it.get('dosageText') or ''}"
                         )
+                    reply_markup = (
+                        {
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "Next ▶",
+                                        "callback_data": "rx_active_next",
+                                    }
+                                ]
+                            ]
+                        }
+                        if st.get("rx_active_lek")
+                        else {}
+                    )
                     _send_message(
-                        chat_id, "Active prescriptions:\n" + "\n".join(lines), settings
+                        chat_id,
+                        "Active prescriptions:\n" + "\n".join(lines),
+                        settings,
+                        reply_markup=reply_markup,
                     )
                 return {"statusCode": 200, "body": "ok"}
 
@@ -872,12 +1003,13 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     ):
                         try:
                             from ...shared.infrastructure.prescriptions_store import (
-                                list_prescriptions,
+                                list_prescriptions_page,
                             )
 
-                            items = list_prescriptions(
+                            items, _ = list_prescriptions_page(
                                 int(chat_id) if isinstance(chat_id, int) else 0,
                                 status="active",
+                                limit=5,
                             )
                             if not items:
                                 _send_message(

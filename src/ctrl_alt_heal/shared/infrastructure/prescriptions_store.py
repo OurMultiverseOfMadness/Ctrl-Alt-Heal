@@ -46,17 +46,19 @@ def save_prescription(
     _table.put_item(Item=item)  # type: ignore[union-attr]
 
 
-def list_prescriptions(
+def list_prescriptions_page(
     chat_id: int,
+    *,
     status: str | None = None,
     limit: int = 10,
     last_evaluated_key: dict[str, Any] | None = None,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     _ensure_table()
     kwargs: dict[str, Any] = {
         "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(
             f"CHAT#{chat_id}"
-        )
+        ),
+        "Limit": limit,
     }
     if last_evaluated_key:
         kwargs["ExclusiveStartKey"] = last_evaluated_key
@@ -64,4 +66,16 @@ def list_prescriptions(
     items = resp.get("Items") or []
     if status:
         items = [it for it in items if it.get("status") == status]
-    return items[:limit]
+    return items, resp.get("LastEvaluatedKey")
+
+
+def list_prescriptions(
+    chat_id: int,
+    status: str | None = None,
+    limit: int = 10,
+    last_evaluated_key: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    items, _ = list_prescriptions_page(
+        chat_id, status=status, limit=limit, last_evaluated_key=last_evaluated_key
+    )
+    return items
