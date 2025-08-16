@@ -575,15 +575,58 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         except Exception:
                             logger.exception("active_next_error")
                 elif isinstance(data, str) and data.startswith("rx_stop::"):
-                    # Stop a prescription by sk
+                    # Stop a prescription by sk, then refresh first page of active RXs
                     sk = data.split("::", 1)[1]
                     try:
                         from ...shared.infrastructure.prescriptions_store import (
+                            list_prescriptions_page,
                             update_prescription_status,
                         )
 
                         update_prescription_status(cb_chat_id, sk, "stopped")
-                        _send_message(cb_chat_id, "Prescription stopped.", settings)
+                        # Refresh view
+                        items, lek = list_prescriptions_page(
+                            cb_chat_id, status="active", limit=5
+                        )
+                        if not items:
+                            _send_message(
+                                cb_chat_id, "No active prescriptions.", settings
+                            )
+                        else:
+                            lines: list[str] = []
+                            for it in items[:5]:
+                                lines.append(
+                                    f"- {it.get('medicationName')}: "
+                                    f"{it.get('dosageText') or ''}"
+                                )
+                            rows: list[list[dict[str, str]]] = []
+                            for it in items[:5]:
+                                sk_val = it.get("sk")
+                                if isinstance(sk_val, str):
+                                    rows.append(
+                                        [
+                                            {
+                                                "text": "⏹ Stop",
+                                                "callback_data": (f"rx_stop::{sk_val}"),
+                                            }
+                                        ]
+                                    )
+                            if lek:
+                                rows.append(
+                                    [
+                                        {
+                                            "text": "Next ▶",
+                                            "callback_data": "rx_active_next",
+                                        }
+                                    ]
+                                )
+                            reply_markup = {"inline_keyboard": rows} if rows else {}
+                            _send_message(
+                                cb_chat_id,
+                                "Active prescriptions (updated):\n" + "\n".join(lines),
+                                settings,
+                                reply_markup=reply_markup,
+                            )
                     except Exception:
                         logger.exception("rx_stop_error")
                 elif data == "set_source_label":
