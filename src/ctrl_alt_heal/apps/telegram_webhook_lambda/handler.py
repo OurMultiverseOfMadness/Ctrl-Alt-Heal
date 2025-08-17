@@ -285,7 +285,13 @@ def _format_until_local(until_iso: str, tzname: str) -> str:
 
         dt = datetime.fromisoformat(until_iso.replace("Z", "+00:00"))
         if tzname != "UTC":
-            dt = dt.astimezone(ZoneInfo(tzname))
+            try:
+                dt = dt.astimezone(ZoneInfo(tzname))
+            except Exception:
+                # Try a normalized variant like "Asia/Singapore"
+                parts = tzname.split("/")
+                norm = "/".join(p[:1].upper() + p[1:].lower() for p in parts)
+                dt = dt.astimezone(ZoneInfo(norm))
         return dt.strftime("%d %b %Y")
     except Exception:
         return until_iso
@@ -520,6 +526,49 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             )
                 except Exception:
                     logger.exception("timezone_from_location_error")
+
+    # Enforce timezone setup before most actions
+    try:
+        guard_chat_id = int(chat_id) if isinstance(chat_id, int) else None
+    except Exception:
+        guard_chat_id = None
+    # Allow-only list of actions that can proceed without a timezone
+    allow_wo_tz: set[str] = {
+        "/start",
+        "/help",
+        "/timezone",
+    }
+    # Extract user text (for commands) early
+    text_any = message.get("text") if isinstance(message, dict) else None
+    text_lower = str(text_any).strip().lower() if isinstance(text_any, str) else ""
+    # If timezone missing, block unless in allow list or timezone buttons
+    if isinstance(guard_chat_id, int):
+        tz_now = _tz_label(guard_chat_id)
+        is_tz_missing = tz_now == "UTC"
+        is_timezone_flow = (
+            text_lower.startswith("/timezone") or text_lower == "set timezone"
+        )
+        if is_tz_missing and not is_timezone_flow and text_lower not in allow_wo_tz:
+            _send_message(
+                guard_chat_id,
+                (
+                    "Please set your timezone first so I can schedule reminders "
+                    "correctly. Tap ‘Set my timezone’ below or send /timezone "
+                    "Asia/Singapore."
+                ),
+                settings,
+                reply_markup={
+                    "inline_keyboard": [
+                        [
+                            {
+                                "text": "🌍 Set my timezone",
+                                "callback_data": "set_timezone",
+                            }
+                        ]
+                    ]
+                },
+            )
+            return {"statusCode": 200, "body": "ok"}
 
     # Handle callback buttons (inline keyboard)
     if isinstance(callback_query, dict):
@@ -954,7 +1003,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 schedule_names2
                             )
                             clear_prescription_schedule(cb_chat_id, sk)
-                        # Refresh view
+                        # Refresh view: send one message per item with actions
                         items, lek = list_prescriptions_page(
                             cb_chat_id, status="active", limit=5
                         )
@@ -963,44 +1012,52 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 cb_chat_id, "No active prescriptions.", settings
                             )
                         else:
-                            lines2: list[str] = []
                             for it in items[:5]:
-                                lines2.append(
-                                    f"- {it.get('medicationName')}: "
-                                    f"{it.get('dosageText') or ''}"
-                                )
-                            stop_item_rows: list[list[dict[str, str]]] = []
-                            for it in items[:5]:
+                                name_txt = str(it.get("medicationName"))
+                                dose_txt = str(it.get("dosageText") or "")
                                 sk_val = it.get("sk")
+                                kb = {}
                                 if isinstance(sk_val, str):
-                                    stop_item_rows.append(
-                                        [
-                                            {
-                                                "text": "⏹ Stop",
-                                                "callback_data": (f"rx_stop::{sk_val}"),
-                                            }
+                                    kb = {
+                                        "inline_keyboard": [
+                                            [
+                                                {
+                                                    "text": (f"⏰ Remind: {name_txt}"),
+                                                    "callback_data": (
+                                                        f"rx_remind::{sk_val}"
+                                                    ),
+                                                },
+                                                {
+                                                    "text": (f"⏹ Stop: {name_txt}"),
+                                                    "callback_data": (
+                                                        f"rx_stop::{sk_val}"
+                                                    ),
+                                                },
+                                            ]
                                         ]
-                                    )
-                            if lek:
-                                stop_item_rows.append(
-                                    [
-                                        {
-                                            "text": "Next ▶",
-                                            "callback_data": "rx_active_next",
-                                        }
-                                    ]
+                                    }
+                                _send_message(
+                                    cb_chat_id,
+                                    f"- {name_txt}: {dose_txt}",
+                                    settings,
+                                    reply_markup=kb,
                                 )
-                            reply_markup = (
-                                {"inline_keyboard": stop_item_rows}
-                                if stop_item_rows
-                                else {}
-                            )
-                            _send_message(
-                                cb_chat_id,
-                                "Active prescriptions (updated):\n" + "\n".join(lines2),
-                                settings,
-                                reply_markup=reply_markup,
-                            )
+                            if lek:
+                                _send_message(
+                                    cb_chat_id,
+                                    "More items available…",
+                                    settings,
+                                    reply_markup={
+                                        "inline_keyboard": [
+                                            [
+                                                {
+                                                    "text": "Next ▶",
+                                                    "callback_data": "rx_active_next",
+                                                }
+                                            ]
+                                        ]
+                                    },
+                                )
                     except Exception:
                         logger.exception("rx_stop_error")
                 elif data == "set_source_label":
@@ -1168,6 +1225,13 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         "- Set up reminders and adherence schedules.\n"
                         "- Set your timezone (auto-detect via location or quick-pick)"
                         " for local-time reminders.\n\n"
+                        "Change reminder times:\n"
+                        "1) Open /active or /history and tap ⏰ Remind under a "
+                        "prescription.\n"
+                        "2) Reply with times in 24h HH:MM, comma-separated (e.g., "
+                        "08:00, 19:00), or tap OK to accept suggestions.\n"
+                        "3) To clear and reset: go to /reminders and tap ❌ Cancel for"
+                        " that item, then set new times via ⏰ Remind.\n\n"
                         "Commands:\n"
                         "/start — show the main menu\n"
                         "/help — this help\n"
