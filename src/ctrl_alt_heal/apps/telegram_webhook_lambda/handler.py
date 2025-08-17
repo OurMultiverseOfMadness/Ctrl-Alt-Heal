@@ -983,8 +983,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     _send_message(
                         chat_id,
                         (
-                            "Share your location to auto-detect timezone, or reply "
-                            "with an IANA name (e.g., Asia/Singapore)."
+                            "Share your location to auto-detect timezone, or pick "
+                            "one below, or reply with an IANA name (e.g., "
+                            "Asia/Singapore)."
                         ),
                         settings,
                         reply_markup={
@@ -994,7 +995,19 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                         "text": "📍 Share my location",
                                         "request_location": True,
                                     }
-                                ]
+                                ],
+                                [
+                                    {"text": "Asia/Singapore"},
+                                    {"text": "Asia/Kuala_Lumpur"},
+                                ],
+                                [
+                                    {"text": "Asia/Jakarta"},
+                                    {"text": "Asia/Bangkok"},
+                                ],
+                                [
+                                    {"text": "Asia/Manila"},
+                                    {"text": "Asia/Ho_Chi_Minh"},
+                                ],
                             ],
                             "resize_keyboard": True,
                             "one_time_keyboard": True,
