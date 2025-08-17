@@ -84,10 +84,12 @@ def _send_message(
                             {
                                 "role": "system",
                                 "content": (
-                                    "You are a translator for patient-friendly health "
-                                    "messages. Translate into the user's language, "
-                                    "but preserve medicine names in English (do not "
-                                    "translate drug names)."
+                                    "You are a healthcare translator. "
+                                    "Translate into the target language ONLY. "
+                                    "Preserve medicine names in English. "
+                                    "No transliterations (Pinyin), phonetics, "
+                                    "romanization, commentary, parentheses, or "
+                                    "explanations. Output ONLY the translated text."
                                 ),
                             },
                             {
