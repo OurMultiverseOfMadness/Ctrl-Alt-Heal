@@ -50,18 +50,42 @@ class ReminderScheduler:
                 "action": "send_reminder",
                 "until": until_iso,
             }
-            self._client.create_schedule(
-                Name=name,
-                GroupName=self._group_name,
-                ScheduleExpression=f"cron({cron})",
-                FlexibleTimeWindow={"Mode": "OFF"},
-                Target={
-                    "Arn": self._target_arn,
-                    "RoleArn": self._role_arn,
-                    "Input": json.dumps(payload),
-                },
-                **({"EndDate": end_dt} if end_dt is not None else {}),
-            )
+            try:
+                self._client.create_schedule(
+                    Name=name,
+                    GroupName=self._group_name,
+                    ScheduleExpression=f"cron({cron})",
+                    FlexibleTimeWindow={"Mode": "OFF"},
+                    Target={
+                        "Arn": self._target_arn,
+                        "RoleArn": self._role_arn,
+                        "Input": json.dumps(payload),
+                    },
+                    **({"EndDate": end_dt} if end_dt is not None else {}),
+                )
+            except Exception as e:
+                # If schedule already exists, update it idempotently
+                msg = str(e)
+                if "already exists" in msg or "ConflictException" in msg:
+                    try:
+                        self._client.update_schedule(
+                            Name=name,
+                            GroupName=self._group_name,
+                            ScheduleExpression=f"cron({cron})",
+                            FlexibleTimeWindow={"Mode": "OFF"},
+                            Target={
+                                "Arn": self._target_arn,
+                                "RoleArn": self._role_arn,
+                                "Input": json.dumps(payload),
+                            },
+                            **({"EndDate": end_dt} if end_dt is not None else {}),
+                        )
+                    except Exception:
+                        # Best effort; keep going
+                        pass
+                else:
+                    # Unknown error; re-raise
+                    raise
             names.append(name)
         return names
 

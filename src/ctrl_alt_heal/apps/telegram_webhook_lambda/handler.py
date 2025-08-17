@@ -68,6 +68,16 @@ def _send_message(
                     import json as _json2
                     from urllib.request import Request, urlopen
 
+                    # secret may be raw or JSON with api_key
+                    api_key = api_secret
+                    try:
+                        parsed_secret = _json2.loads(api_secret)
+                        if isinstance(parsed_secret, dict):
+                            k = parsed_secret.get("api_key") or parsed_secret.get("key")
+                            if isinstance(k, str) and k:
+                                api_key = k
+                    except Exception:
+                        pass
                     body = {
                         "model": "aisingapore/Llama-SEA-LION-v3.5-8B-R",
                         "messages": [
@@ -93,8 +103,8 @@ def _send_message(
                         data=_json2.dumps(body).encode("utf-8"),
                         headers={
                             "Content-Type": "application/json",
-                            "Authorization": f"Bearer {api_secret}",
-                            "accept": "text/plain",
+                            "Authorization": f"Bearer {api_key}",
+                            "accept": "application/json",
                         },
                         method="POST",
                     )
@@ -186,6 +196,44 @@ def _send_contact_request(chat_id: int, settings: Settings) -> None:
             pass
     except urllib.error.URLError:
         pass
+
+
+def _send_next_steps(chat_id: int, settings: Settings) -> None:
+    _send_message(
+        chat_id,
+        "What would you like to do next?",
+        settings,
+        reply_markup={
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "📷 Label (single)",
+                        "callback_data": "set_source_label",
+                    },
+                    {
+                        "text": "📝 Prescription (multi)",
+                        "callback_data": "set_source_prescription",
+                    },
+                ],
+                [
+                    {
+                        "text": "📄 Upload FHIR record",
+                        "callback_data": "upload_fhir",
+                    }
+                ],
+                [
+                    {
+                        "text": "🌐 Set language",
+                        "callback_data": "set_language",
+                    },
+                    {
+                        "text": "🌍 Set timezone",
+                        "callback_data": "set_timezone",
+                    },
+                ],
+            ]
+        },
+    )
 
 
 def _ensure_phone(
@@ -597,6 +645,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 settings,
                                 reply_markup={"remove_keyboard": True},
                             )
+                            _send_next_steps(chat_id, settings)
                 except Exception:
                     logger.exception("timezone_from_location_error")
 
@@ -763,6 +812,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             f"Language saved: {lang}.",
                             settings,
                         )
+                        _send_next_steps(cb_chat_id, settings)
                     except Exception:
                         logger.exception("set_language_error")
                     cb_from = callback_query.get("from") or {}
@@ -1490,6 +1540,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 f"Language saved: {lang_arg}.",
                                 settings,
                             )
+                            _send_next_steps(chat_id, settings)
                     except Exception:
                         logger.exception("language_cmd_error")
                 else:
