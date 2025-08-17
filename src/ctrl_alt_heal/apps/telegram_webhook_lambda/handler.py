@@ -726,18 +726,30 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             "inline_keyboard": [
                                 [
                                     {"text": "English", "callback_data": "lang_en"},
-                                    {
-                                        "text": "Bahasa Indonesia",
-                                        "callback_data": "lang_id",
-                                    },
+                                    {"text": "Chinese", "callback_data": "lang_zh"},
                                 ],
                                 [
+                                    {"text": "Indonesian", "callback_data": "lang_id"},
                                     {"text": "Malay", "callback_data": "lang_ms"},
-                                    {"text": "Thai", "callback_data": "lang_th"},
                                 ],
                                 [
+                                    {"text": "Thai", "callback_data": "lang_th"},
                                     {"text": "Vietnamese", "callback_data": "lang_vi"},
-                                    {"text": "Tagalog", "callback_data": "lang_tl"},
+                                ],
+                                [
+                                    {"text": "Filipino", "callback_data": "lang_tl"},
+                                    {"text": "Tamil", "callback_data": "lang_ta"},
+                                ],
+                                [
+                                    {"text": "Burmese", "callback_data": "lang_my"},
+                                    {"text": "Khmer", "callback_data": "lang_km"},
+                                ],
+                                [
+                                    {"text": "Lao", "callback_data": "lang_lo"},
+                                    {"text": "Javanese", "callback_data": "lang_jv"},
+                                ],
+                                [
+                                    {"text": "Sundanese", "callback_data": "lang_su"},
                                 ],
                             ]
                         },
@@ -1492,18 +1504,30 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             "inline_keyboard": [
                                 [
                                     {"text": "English", "callback_data": "lang_en"},
-                                    {
-                                        "text": "Bahasa Indonesia",
-                                        "callback_data": "lang_id",
-                                    },
+                                    {"text": "Chinese", "callback_data": "lang_zh"},
                                 ],
                                 [
+                                    {"text": "Indonesian", "callback_data": "lang_id"},
                                     {"text": "Malay", "callback_data": "lang_ms"},
-                                    {"text": "Thai", "callback_data": "lang_th"},
                                 ],
                                 [
+                                    {"text": "Thai", "callback_data": "lang_th"},
                                     {"text": "Vietnamese", "callback_data": "lang_vi"},
-                                    {"text": "Tagalog", "callback_data": "lang_tl"},
+                                ],
+                                [
+                                    {"text": "Filipino", "callback_data": "lang_tl"},
+                                    {"text": "Tamil", "callback_data": "lang_ta"},
+                                ],
+                                [
+                                    {"text": "Burmese", "callback_data": "lang_my"},
+                                    {"text": "Khmer", "callback_data": "lang_km"},
+                                ],
+                                [
+                                    {"text": "Lao", "callback_data": "lang_lo"},
+                                    {"text": "Javanese", "callback_data": "lang_jv"},
+                                ],
+                                [
+                                    {"text": "Sundanese", "callback_data": "lang_su"},
                                 ],
                             ]
                         },
