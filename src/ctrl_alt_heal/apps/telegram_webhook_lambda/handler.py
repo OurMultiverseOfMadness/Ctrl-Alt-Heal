@@ -377,6 +377,41 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         )
                 except Exception:
                     logger.exception("identity_phone_link_error")
+        # Handle location share for timezone detection
+        loc = message.get("location")
+        if isinstance(loc, dict):
+            lat = loc.get("latitude")
+            lon = loc.get("longitude")
+            from_user = message.get("from") or {}
+            uid2 = from_user.get("id") if isinstance(from_user, dict) else None
+            if (
+                isinstance(uid2, int)
+                and isinstance(lat, int | float)
+                and isinstance(lon, int | float)
+            ):
+                try:
+                    from ...shared.infrastructure.identities import (
+                        upsert_timezone_for_telegram,
+                    )
+                    from ...shared.infrastructure.timezone_infer import (
+                        infer_timezone_from_coords,
+                    )
+
+                    tz = infer_timezone_from_coords(float(lat), float(lon))
+                    if tz:
+                        upsert_timezone_for_telegram(uid2, tz)
+                        if isinstance(chat_id, int):
+                            _send_message(
+                                chat_id,
+                                (
+                                    f"Timezone set to {tz}. We'll schedule reminders "
+                                    "in your local time."
+                                ),
+                                settings,
+                                reply_markup={"remove_keyboard": True},
+                            )
+                except Exception:
+                    logger.exception("timezone_from_location_error")
 
     # Handle callback buttons (inline keyboard)
     if isinstance(callback_query, dict):
@@ -455,6 +490,40 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         reply_to_message_id=cb_message_id
                         if isinstance(cb_message_id, int)
                         else None,
+                    )
+                elif data == "set_timezone":
+                    # Offer auto-detect (location) or quick-pick list
+                    _send_message(
+                        cb_chat_id,
+                        (
+                            "Share your location to auto-detect timezone, or pick "
+                            "one below."
+                        ),
+                        settings,
+                        reply_markup={
+                            "keyboard": [
+                                [
+                                    {
+                                        "text": "📍 Share my location",
+                                        "request_location": True,
+                                    }
+                                ],
+                                [
+                                    {"text": "Asia/Singapore"},
+                                    {"text": "Asia/Kuala_Lumpur"},
+                                ],
+                                [
+                                    {"text": "Asia/Jakarta"},
+                                    {"text": "Asia/Bangkok"},
+                                ],
+                                [
+                                    {"text": "Asia/Manila"},
+                                    {"text": "Asia/Ho_Chi_Minh"},
+                                ],
+                            ],
+                            "resize_keyboard": True,
+                            "one_time_keyboard": True,
+                        },
                     )
                 elif data in {
                     "fhir_sample_1",
@@ -841,6 +910,12 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                     "callback_data": "upload_fhir",
                                 }
                             ],
+                            [
+                                {
+                                    "text": "🌍 Set my timezone",
+                                    "callback_data": "set_timezone",
+                                }
+                            ],
                         ]
                     },
                 )
@@ -865,17 +940,66 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         "prescription (multiple).\n"
                         "- Upload a FHIR record from your hospital portal.\n"
                         "- List your prescriptions and see what’s active.\n"
-                        "- Set up reminders (coming soon).\n\n"
+                        "- Set up reminders and adherence schedules.\n"
+                        "- Set your timezone (auto-detect via location or quick-pick)"
+                        " for local-time reminders.\n\n"
                         "Commands:\n"
                         "/start — show the main menu\n"
                         "/help — this help\n"
                         "/history — recent prescriptions\n"
-                        "/active — active prescriptions\n\n"
+                        "/active — active prescriptions\n"
+                        "/timezone [IANA_TZ] — set timezone (e.g., /timezone "
+                        "Asia/Singapore)\n\n"
                         'Tip: You can also ask, e.g. "what are my active '
                         'prescriptions?"'
                     ),
                     settings,
                 )
+                return {"statusCode": 200, "body": "ok"}
+            if cmd == "timezone":
+                # /timezone [IANA_TZ]
+                tz_arg = (_args or "").strip() if isinstance(_args, str) else ""
+                if tz_arg:
+                    try:
+                        from ...shared.infrastructure.identities import (
+                            upsert_timezone_for_telegram,
+                        )
+
+                        from_user = message.get("from") or {}
+                        uid = (
+                            from_user.get("id") if isinstance(from_user, dict) else None
+                        )
+                        if isinstance(uid, int):
+                            upsert_timezone_for_telegram(uid, tz_arg)
+                            _send_message(
+                                chat_id,
+                                f"Timezone set to {tz_arg}.",
+                                settings,
+                                reply_markup={"remove_keyboard": True},
+                            )
+                    except Exception:
+                        logger.exception("timezone_cmd_error")
+                else:
+                    _send_message(
+                        chat_id,
+                        (
+                            "Share your location to auto-detect timezone, or reply "
+                            "with an IANA name (e.g., Asia/Singapore)."
+                        ),
+                        settings,
+                        reply_markup={
+                            "keyboard": [
+                                [
+                                    {
+                                        "text": "📍 Share my location",
+                                        "request_location": True,
+                                    }
+                                ]
+                            ],
+                            "resize_keyboard": True,
+                            "one_time_keyboard": True,
+                        },
+                    )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "history":
                 items = []
@@ -1108,6 +1232,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             elif state.get("rx_remind_pending") and has_text:
                 # User provided custom times, e.g. "08:00, 20:00"
                 try:
+                    from ...shared.infrastructure.identities import (
+                        get_identity_by_telegram,
+                    )
                     from ...shared.infrastructure.prescriptions_store import (
                         set_prescription_schedule,
                     )
@@ -1130,9 +1257,21 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         from datetime import UTC, datetime, timedelta
 
                         until = (datetime.now(UTC) + timedelta(days=30)).isoformat()
+                        ident = get_identity_by_telegram(int(chat_id)) or {}
+                        tz = (
+                            (ident.get("attrs") or {}).get("timezone")
+                            if isinstance(ident, dict)
+                            else None
+                        )
+                        tzname = str(tz) if isinstance(tz, str) and tz else "UTC"
+                        times_utc = (
+                            ReminderScheduler.local_times_to_utc(times, tzname)
+                            if tzname != "UTC"
+                            else times
+                        )
                         set_prescription_schedule(int(chat_id), sk, times, until)
                         ReminderScheduler(settings.aws_region).create_cron_schedules(
-                            int(chat_id), sk, times, until
+                            int(chat_id), sk, times_utc, until
                         )
                         _send_message(
                             chat_id,
@@ -1208,6 +1347,37 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 elif has_text and not text_lower.startswith("/"):
                     # Simple NLU for "what are my active prescriptions?"
                     tl = text_lower
+                    # Handle quick-pick timezone text
+                    if text_lower in {
+                        "asia/singapore",
+                        "asia/kuala_lumpur",
+                        "asia/jakarta",
+                        "asia/bangkok",
+                        "asia/manila",
+                        "asia/ho_chi_minh",
+                    }:
+                        try:
+                            from ...shared.infrastructure.identities import (
+                                upsert_timezone_for_telegram,
+                            )
+
+                            from_user = message.get("from") or {}
+                            uid = (
+                                from_user.get("id")
+                                if isinstance(from_user, dict)
+                                else None
+                            )
+                            if isinstance(uid, int):
+                                upsert_timezone_for_telegram(uid, text_lower)
+                                _send_message(
+                                    chat_id,
+                                    f"Timezone set to {text_lower}.",
+                                    settings,
+                                    reply_markup={"remove_keyboard": True},
+                                )
+                                return {"statusCode": 200, "body": "ok"}
+                        except Exception:
+                            logger.exception("timezone_quickpick_error")
                     if "active" in tl and (
                         "rx" in tl or "prescription" in tl or "med" in tl
                     ):
