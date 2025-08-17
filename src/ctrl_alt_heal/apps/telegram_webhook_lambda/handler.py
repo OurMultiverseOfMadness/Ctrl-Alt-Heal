@@ -97,6 +97,8 @@ def _send_message(
                                 ),
                             },
                         ],
+                        "chat_template_kwargs": {"thinking_mode": "off"},
+                        "cache": {"no-cache": True},
                     }
                     req = Request(
                         "https://api.sea-lion.ai/v1/chat/completions",
