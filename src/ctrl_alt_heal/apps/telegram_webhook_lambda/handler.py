@@ -649,7 +649,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     # User accepted suggested times; create schedules
                     try:
                         _, sk, label = data.split("::", 2)
-                        times = [t.strip() for t in label.split(",") if t.strip()]
+                        times_raw = [t.strip() for t in label.split(",") if t.strip()]
                         from datetime import UTC, datetime, timedelta
 
                         from ...shared.infrastructure.identities import (
@@ -672,11 +672,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         )
                         tzname = str(tz) if isinstance(tz, str) and tz else "UTC"
                         times_utc = (
-                            ReminderScheduler.local_times_to_utc(times, tzname)
+                            (ReminderScheduler.local_times_to_utc(times_raw, tzname))
                             if tzname != "UTC"
-                            else times
+                            else times_raw
                         )
-                        set_prescription_schedule(cb_chat_id, sk, times, until)
+                        set_prescription_schedule(cb_chat_id, sk, times_raw, until)
                         sched = ReminderScheduler(settings.aws_region)
                         names = sched.create_cron_schedules(
                             cb_chat_id, sk, times_utc, until
@@ -686,7 +686,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             cb_chat_id,
                             (
                                 "Reminders set at "
-                                + ", ".join(times)
+                                + ", ".join(times_raw)
                                 + (f" ({tzname})" if tzname != "UTC" else " UTC")
                                 + ". Update with /reminders or send new times."
                             ),
@@ -752,13 +752,20 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         )
                         from ...shared.infrastructure.scheduler import ReminderScheduler
 
-                        rx = get_prescription(cb_chat_id, sk) or {}
-                        names = (
-                            rx.get("scheduleNames") if isinstance(rx, dict) else None
+                        rx_obj = get_prescription(cb_chat_id, sk)
+                        schedule_names_raw = (
+                            rx_obj.get("scheduleNames")
+                            if isinstance(rx_obj, dict)
+                            else None
                         )
-                        if isinstance(names, list) and names:
+                        schedule_names: list[str] = (
+                            [str(n) for n in schedule_names_raw]
+                            if isinstance(schedule_names_raw, list)
+                            else []
+                        )
+                        if schedule_names:
                             ReminderScheduler(settings.aws_region).delete_schedules(
-                                [str(n) for n in names]
+                                schedule_names
                             )
                         clear_prescription_schedule(cb_chat_id, sk)
                         _send_message(cb_chat_id, "Reminders cancelled.", settings)
@@ -778,13 +785,20 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
                         update_prescription_status(cb_chat_id, sk, "stopped")
                         # If schedules exist, delete them
-                        rx = get_prescription(cb_chat_id, sk) or {}
-                        names = (
-                            rx.get("scheduleNames") if isinstance(rx, dict) else None
+                        rx_obj2 = get_prescription(cb_chat_id, sk)
+                        schedule_names_raw2 = (
+                            rx_obj2.get("scheduleNames")
+                            if isinstance(rx_obj2, dict)
+                            else None
                         )
-                        if isinstance(names, list) and names:
+                        schedule_names2: list[str] = (
+                            [str(n) for n in schedule_names_raw2]
+                            if isinstance(schedule_names_raw2, list)
+                            else []
+                        )
+                        if schedule_names2:
                             ReminderScheduler(settings.aws_region).delete_schedules(
-                                [str(n) for n in names]
+                                schedule_names2
                             )
                             clear_prescription_schedule(cb_chat_id, sk)
                         # Refresh view
@@ -802,11 +816,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                     f"- {it.get('medicationName')}: "
                                     f"{it.get('dosageText') or ''}"
                                 )
-                            rows: list[list[dict[str, str]]] = []
+                            stop_item_rows: list[list[dict[str, str]]] = []
                             for it in items[:5]:
                                 sk_val = it.get("sk")
                                 if isinstance(sk_val, str):
-                                    rows.append(
+                                    stop_item_rows.append(
                                         [
                                             {
                                                 "text": "⏹ Stop",
@@ -815,7 +829,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                         ]
                                     )
                             if lek:
-                                rows.append(
+                                stop_item_rows.append(
                                     [
                                         {
                                             "text": "Next ▶",
@@ -823,7 +837,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                         }
                                     ]
                                 )
-                            reply_markup = {"inline_keyboard": rows} if rows else {}
+                            reply_markup = (
+                                {"inline_keyboard": stop_item_rows}
+                                if stop_item_rows
+                                else {}
+                            )
                             _send_message(
                                 cb_chat_id,
                                 "Active prescriptions (updated):\n" + "\n".join(lines2),
@@ -970,11 +988,17 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 # If identity lacks phone, ask for contact share
                 try:
                     from_user = message.get("from") or {}
-                    uid = from_user.get("id") if isinstance(from_user, dict) else None
-                    if isinstance(uid, int):
-                        ident = get_identity_by_telegram(uid)
-                        phone = (ident or {}).get("phone") if ident else None
-                        if not phone:
+                    uid_start = (
+                        from_user.get("id") if isinstance(from_user, dict) else None
+                    )
+                    if isinstance(uid_start, int):
+                        ident_start = get_identity_by_telegram(uid_start) or {}
+                        phone_start = (
+                            ident_start.get("phone")
+                            if isinstance(ident_start, dict)
+                            else None
+                        )
+                        if not phone_start:
                             _send_contact_request(chat_id, settings)
                 except Exception:
                     pass
@@ -1083,11 +1107,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 else:
                     # Per-item action rows
                     kb_rows: list[list[dict[str, str]]] = []
-                    parts: list[str] = []
+                    history_item_lines: list[str] = []
                     for it in items[:5]:
                         name = it.get("medicationName")
                         dose = it.get("dosageText") or ""
-                        parts.append(f"- {name}: {dose}")
+                        history_item_lines.append(f"- {name}: {dose}")
                         sk_val = it.get("sk")
                         if isinstance(sk_val, str):
                             kb_rows.append(
@@ -1113,7 +1137,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         )
                     _send_message(
                         chat_id,
-                        "Your prescriptions:\n" + "\n".join(parts),
+                        "Your prescriptions:\n" + "\n".join(history_item_lines),
                         settings,
                         reply_markup={"inline_keyboard": kb_rows} if kb_rows else {},
                     )
@@ -1139,16 +1163,16 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     _send_message(chat_id, "No active prescriptions.", settings)
                 else:
                     # Per-item action rows for /active
-                    parts: list[str] = []
-                    rows: list[list[dict[str, str]]] = []
+                    active_item_lines: list[str] = []
+                    active_item_rows: list[list[dict[str, str]]] = []
                     for it in items[:5]:
-                        parts.append(
+                        active_item_lines.append(
                             f"- {it.get('medicationName')}: "
                             f"{it.get('dosageText') or ''}"
                         )
                         sk_val = it.get("sk")
                         if isinstance(sk_val, str):
-                            rows.append(
+                            active_item_rows.append(
                                 [
                                     {
                                         "text": "⏰ Remind",
@@ -1161,7 +1185,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 ]
                             )
                     if st.get("rx_active_lek"):
-                        rows.append(
+                        active_item_rows.append(
                             [
                                 {
                                     "text": "Next ▶",
@@ -1171,9 +1195,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         )
                     _send_message(
                         chat_id,
-                        "Active prescriptions:\n" + "\n".join(parts),
+                        "Active prescriptions:\n" + "\n".join(active_item_lines),
                         settings,
-                        reply_markup={"inline_keyboard": rows} if rows else {},
+                        reply_markup={"inline_keyboard": active_item_rows}
+                        if active_item_rows
+                        else {},
                     )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "reminders":
@@ -1183,12 +1209,13 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         list_prescriptions_page,
                     )
 
-                    items, _ = list_prescriptions_page(
+                    items_tuple = list_prescriptions_page(
                         int(chat_id) if isinstance(chat_id, int) else 0,
                         limit=50,
                     )
-                    rem_lines: list[str] = []
-                    rem_kb_rows: list[list[dict[str, str]]] = []
+                    items = items_tuple[0] if isinstance(items_tuple, tuple) else []
+                    reminder_lines: list[str] = []
+                    reminder_kb_rows: list[list[dict[str, str]]] = []
                     for it in items:
                         nm = it.get("medicationName")
                         times = it.get("scheduleTimes")
@@ -1196,9 +1223,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         sk_val = it.get("sk")
                         if isinstance(times, list) and times:
                             label = ", ".join([str(x) for x in times])
-                            rem_lines.append(f"- {nm}: {label} (until {until})")
+                            reminder_lines.append(
+                                f"- {nm}: {label} (until {str(until)})"
+                            )
                             if isinstance(sk_val, str):
-                                rem_kb_rows.append(
+                                reminder_kb_rows.append(
                                     [
                                         {
                                             "text": "❌ Cancel reminders",
@@ -1206,15 +1235,15 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                         }
                                     ]
                                 )
-                    if not rem_lines:
+                    if not reminder_lines:
                         _send_message(chat_id, "No active reminders.", settings)
                     else:
                         _send_message(
                             chat_id,
-                            "Your reminders:\n" + "\n".join(rem_lines),
+                            "Your reminders:\n" + "\n".join(reminder_lines),
                             settings,
-                            reply_markup={"inline_keyboard": rem_kb_rows}
-                            if rem_kb_rows
+                            reply_markup={"inline_keyboard": reminder_kb_rows}
+                            if reminder_kb_rows
                             else {},
                         )
                 except Exception:
@@ -1358,8 +1387,16 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     )
                     from ...shared.infrastructure.scheduler import ReminderScheduler
 
-                    p = state.get("rx_remind_pending") or {}
-                    sk = p.get("sk") if isinstance(p, dict) else None
+                    pending: dict[str, Any] = (
+                        state.get("rx_remind_pending")
+                        if isinstance(state.get("rx_remind_pending"), dict)
+                        else {}
+                    )
+                    sk = (
+                        pending.get("sk")
+                        if isinstance(pending.get("sk"), str)
+                        else None
+                    )
                     times = parse_times_user_input(str(message.get("text", "")))
                     if not (isinstance(sk, str) and times):
                         _send_message(
@@ -1372,35 +1409,32 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         from datetime import UTC, datetime, timedelta
 
                         until = (datetime.now(UTC) + timedelta(days=30)).isoformat()
-                        ident = get_identity_by_telegram(int(chat_id)) or {}
-                        tz = (
-                            (ident.get("attrs") or {}).get("timezone")
-                            if isinstance(ident, dict)
-                            else None
+                        ident_any = get_identity_by_telegram(int(chat_id))
+                        ident_dict: dict[str, Any] = (
+                            ident_any if isinstance(ident_any, dict) else {}
                         )
-                        tzname = str(tz) if isinstance(tz, str) and tz else "UTC"
+                        attrs_any = ident_dict.get("attrs")
+                        attrs_dict: dict[str, Any] = (
+                            attrs_any if isinstance(attrs_any, dict) else {}
+                        )
+                        tz_val = attrs_dict.get("timezone")
+                        tzname = (
+                            str(tz_val) if isinstance(tz_val, str) and tz_val else "UTC"
+                        )
                         times_utc = (
                             ReminderScheduler.local_times_to_utc(times, tzname)
                             if tzname != "UTC"
                             else times
                         )
                         set_prescription_schedule(int(chat_id), sk, times, until)
-                        sched = ReminderScheduler(settings.aws_region)
-                        names = sched.create_cron_schedules(
+                        ReminderScheduler(settings.aws_region).create_cron_schedules(
                             int(chat_id), sk, times_utc, until
                         )
-                        from ...shared.infrastructure.prescriptions_store import (
-                            set_prescription_schedule_names,
-                        )
-
-                        set_prescription_schedule_names(int(chat_id), sk, names)
                         _send_message(
                             chat_id,
                             (
-                                "Reminders set at "
-                                + ", ".join(times)
-                                + (f" ({tzname})" if tzname != "UTC" else " UTC")
-                                + ". You can update anytime by sending new times."
+                                "Reminders set. You can update anytime by sending "
+                                "new times."
                             ),
                             settings,
                         )
