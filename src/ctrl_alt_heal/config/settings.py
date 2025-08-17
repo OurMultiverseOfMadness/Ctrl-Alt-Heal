@@ -29,6 +29,8 @@ class Settings:
     scheduler_role_arn: str | None = None
     # FHIR persistence
     fhir_table_name: str | None = None
+    # SEA LION translation
+    sealion_secret_arn: str | None = None
 
     @staticmethod
     def load() -> Settings:
@@ -57,4 +59,5 @@ class Settings:
             reminder_target_arn=os.environ.get("REMINDER_TARGET_ARN"),
             scheduler_role_arn=os.environ.get("SCHEDULER_ROLE_ARN"),
             fhir_table_name=os.environ.get("FHIR_TABLE_NAME"),
+            sealion_secret_arn=os.environ.get("SEALION_SECRET_ARN"),
         )
