@@ -1320,9 +1320,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         name_txt = str(it.get("medicationName"))
                         dose_txt = str(it.get("dosageText") or "")
                         sk_val = it.get("sk")
-                        reply_markup: dict[str, object] = {}
+                        kb = {}
                         if isinstance(sk_val, str):
-                            reply_markup = {
+                            kb = {
                                 "inline_keyboard": [
                                     [
                                         {
@@ -1340,7 +1340,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             chat_id,
                             f"- {name_txt}: {dose_txt}",
                             settings,
-                            reply_markup=reply_markup,
+                            reply_markup=kb,
                         )
                     if st_active.get("rx_active_lek"):
                         _send_message(
@@ -1360,7 +1360,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "reminders":
-                # List current schedules (from materialized RX items)
+                # List current schedules (from materialized RX items), per-item
                 try:
                     from ...shared.infrastructure.prescriptions_store import (
                         list_prescriptions_page,
@@ -1372,49 +1372,48 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         limit=50,
                     )
                     items = items_tuple[0] if isinstance(items_tuple, tuple) else []
-                    reminder_lines: list[str] = []
-                    reminder_kb_rows: list[list[dict[str, str]]] = []
                     tz_list_label = _tz_label(
                         int(chat_id) if isinstance(chat_id, int) else 0
                     )
+                    any_sent = False
                     for it in items:
-                        nm = it.get("medicationName")
-                        times = it.get("scheduleTimes")
-                        until = it.get("scheduleUntil")
+                        nm_any = it.get("medicationName")
+                        nm = str(nm_any) if nm_any is not None else "(unknown)"
+                        times_any = it.get("scheduleTimes")
+                        until_any = it.get("scheduleUntil")
                         sk_val = it.get("sk")
-                        if isinstance(times, list) and times:
+                        if isinstance(times_any, list) and times_any:
+                            times_strs = [str(x) for x in times_any]
                             times_local = (
                                 ReminderScheduler.utc_times_to_local(
-                                    [str(x) for x in times], tz_list_label
+                                    times_strs, tz_list_label
                                 )
                                 if tz_list_label != "UTC"
-                                else [str(x) for x in times]
+                                else times_strs
                             )
                             label = ", ".join(times_local)
-                            until_h = _format_until_local(str(until), tz_list_label)
-                            reminder_lines.append(
-                                f"- {nm}: {label} ({tz_list_label}), until {until_h}"
-                            )
+                            until_h = _format_until_local(str(until_any), tz_list_label)
+                            kb = {}
                             if isinstance(sk_val, str):
-                                reminder_kb_rows.append(
-                                    [
-                                        {
-                                            "text": "❌ Cancel reminders",
-                                            "callback_data": f"rx_cancel::{sk_val}",
-                                        }
+                                kb = {
+                                    "inline_keyboard": [
+                                        [
+                                            {
+                                                "text": "❌ Cancel reminders",
+                                                "callback_data": f"rx_cancel::{sk_val}",
+                                            }
+                                        ]
                                     ]
-                                )
-                    if not reminder_lines:
+                                }
+                            _send_message(
+                                chat_id,
+                                f"- {nm}: {label} ({tz_list_label}), until {until_h}",
+                                settings,
+                                reply_markup=kb,
+                            )
+                            any_sent = True
+                    if not any_sent:
                         _send_message(chat_id, "No active reminders.", settings)
-                    else:
-                        _send_message(
-                            chat_id,
-                            "Your reminders:\n" + "\n".join(reminder_lines),
-                            settings,
-                            reply_markup={"inline_keyboard": reminder_kb_rows}
-                            if reminder_kb_rows
-                            else {},
-                        )
                 except Exception:
                     logger.exception("reminders_list_error")
                 return {"statusCode": 200, "body": "ok"}
@@ -1556,18 +1555,23 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     )
                     from ...shared.infrastructure.scheduler import ReminderScheduler
 
+                    pending_any = state.get("rx_remind_pending")
                     pending: dict[str, Any] = (
-                        state.get("rx_remind_pending")
-                        if isinstance(state.get("rx_remind_pending"), dict)
-                        else {}
+                        pending_any if isinstance(pending_any, dict) else {}
                     )
-                    sk = (
-                        pending.get("sk")
-                        if isinstance(pending.get("sk"), str)
-                        else None
+                    sk_any = pending.get("sk")
+                    sk_pending: str | None = sk_any if isinstance(sk_any, str) else None
+                    times_list_custom = parse_times_user_input(
+                        str(message.get("text", ""))
                     )
-                    times = parse_times_user_input(str(message.get("text", "")))
-                    if not (isinstance(sk, str) and times):
+                    times_custom: list[str] = (
+                        times_list_custom if isinstance(times_list_custom, list) else []
+                    )
+                    if not (
+                        isinstance(sk_pending, str)
+                        and isinstance(times_custom, list)
+                        and times_custom
+                    ):
                         _send_message(
                             chat_id,
                             "Please provide times like 08:00, 20:00",
@@ -1586,23 +1590,27 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         attrs_dict: dict[str, Any] = (
                             attrs_any if isinstance(attrs_any, dict) else {}
                         )
-                        tz_val = attrs_dict.get("timezone")
+                        tz_val_any = attrs_dict.get("timezone")
                         tzname = (
-                            str(tz_val) if isinstance(tz_val, str) and tz_val else "UTC"
+                            str(tz_val_any)
+                            if isinstance(tz_val_any, str) and tz_val_any
+                            else "UTC"
                         )
                         times_utc = (
-                            ReminderScheduler.local_times_to_utc(times, tzname)
+                            ReminderScheduler.local_times_to_utc(times_custom, tzname)
                             if tzname != "UTC"
-                            else times
+                            else list(times_custom)
                         )
-                        set_prescription_schedule(int(chat_id), sk, times, until)
+                        set_prescription_schedule(
+                            int(chat_id), sk_pending, times_custom, until
+                        )
                         ReminderScheduler(settings.aws_region).create_cron_schedules(
-                            int(chat_id), sk, times_utc, until
+                            int(chat_id), sk_pending, times_utc, until
                         )
                         disp_local2 = (
                             ReminderScheduler.utc_times_to_local(times_utc, tzname)
                             if tzname != "UTC"
-                            else times
+                            else list(times_custom)
                         )
                         _send_message(
                             chat_id,
