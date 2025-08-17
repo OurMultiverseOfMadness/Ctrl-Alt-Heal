@@ -54,6 +54,7 @@ def list_prescriptions_page(
     last_evaluated_key: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     _ensure_table()
+    assert _table is not None
     kwargs: dict[str, Any] = {
         "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(
             f"CHAT#{chat_id}"
@@ -62,7 +63,7 @@ def list_prescriptions_page(
     }
     if last_evaluated_key:
         kwargs["ExclusiveStartKey"] = last_evaluated_key
-    resp = _table.query(**kwargs)  # type: ignore[arg-type]
+    resp = _table.query(**kwargs)
     items = resp.get("Items") or []
     if status:
         items = [it for it in items if it.get("status") == status]
@@ -93,9 +94,8 @@ def update_prescription_status(chat_id: int, sk: str, status: str) -> None:
 
 def get_prescription(chat_id: int, sk: str) -> dict[str, Any] | None:
     _ensure_table()
-    resp = _table.get_item(  # type: ignore[union-attr]
-        Key={"pk": f"CHAT#{chat_id}", "sk": sk}
-    )
+    assert _table is not None
+    resp = _table.get_item(Key={"pk": f"CHAT#{chat_id}", "sk": sk})
     item = resp.get("Item") if isinstance(resp, dict) else None
     return item if isinstance(item, dict) else None
 

@@ -568,7 +568,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             )
                             st["rx_history_lek"] = next_lek
                             set_state(cb_chat_id, st)
-                            lines = [
+                            page_lines_hist = [
                                 (
                                     f"- {it.get('medicationName')}: "
                                     f"{it.get('dosageText') or ''}"
@@ -591,7 +591,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             )
                             _send_message(
                                 cb_chat_id,
-                                "Your prescriptions (more):\n" + "\n".join(lines),
+                                "Your prescriptions (more):\n"
+                                + "\n".join(page_lines_hist),
                                 settings,
                                 reply_markup=markup,
                             )
@@ -614,7 +615,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             )
                             st["rx_active_lek"] = next_lek
                             set_state(cb_chat_id, st)
-                            lines = [
+                            page_lines_active = [
                                 (
                                     f"- {it.get('medicationName')}: "
                                     f"{it.get('dosageText') or ''}"
@@ -637,7 +638,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             )
                             _send_message(
                                 cb_chat_id,
-                                "Active prescriptions (more):\n" + "\n".join(lines),
+                                "Active prescriptions (more):\n"
+                                + "\n".join(page_lines_active),
                                 settings,
                                 reply_markup=markup,
                             )
@@ -686,7 +688,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 "Reminders set at "
                                 + ", ".join(times)
                                 + (f" ({tzname})" if tzname != "UTC" else " UTC")
-                                + ". You can update by sending new times."
+                                + ". Update with /reminders or send new times."
                             ),
                             settings,
                         )
@@ -732,9 +734,12 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                     ]
                                 },
                             )
-                            st = get_state(cb_chat_id)
-                            st["rx_remind_pending"] = {"sk": sk, "times": times}
-                            set_state(cb_chat_id, st)
+                            st_pending = get_state(cb_chat_id)
+                            st_pending["rx_remind_pending"] = {
+                                "sk": sk,
+                                "times": times,
+                            }
+                            set_state(cb_chat_id, st_pending)
                     except Exception:
                         logger.exception("rx_remind_error")
                 elif isinstance(data, str) and data.startswith("rx_cancel::"):
@@ -791,9 +796,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 cb_chat_id, "No active prescriptions.", settings
                             )
                         else:
-                            lines: list[str] = []
+                            lines2: list[str] = []
                             for it in items[:5]:
-                                lines.append(
+                                lines2.append(
                                     f"- {it.get('medicationName')}: "
                                     f"{it.get('dosageText') or ''}"
                                 )
@@ -821,7 +826,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             reply_markup = {"inline_keyboard": rows} if rows else {}
                             _send_message(
                                 cb_chat_id,
-                                "Active prescriptions (updated):\n" + "\n".join(lines),
+                                "Active prescriptions (updated):\n" + "\n".join(lines2),
                                 settings,
                                 reply_markup=reply_markup,
                             )
@@ -1125,22 +1130,22 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         status="active",
                         limit=5,
                     )
-                    st = get_state(chat_id)
-                    st["rx_active_lek"] = lek
-                    set_state(chat_id, st)
+                    st_active = get_state(chat_id)
+                    st_active["rx_active_lek"] = lek
+                    set_state(chat_id, st_active)
                 except Exception:
                     logger.exception("active_list_error")
                 if not items:
                     _send_message(chat_id, "No active prescriptions.", settings)
                 else:
-                    lines: list[str] = []
+                    # Per-item action rows for /active
+                    parts: list[str] = []
+                    rows: list[list[dict[str, str]]] = []
                     for it in items[:5]:
-                        lines.append(
+                        parts.append(
                             f"- {it.get('medicationName')}: "
                             f"{it.get('dosageText') or ''}"
                         )
-                    rows: list[list[dict[str, str]]] = []
-                    for it in items[:5]:
                         sk_val = it.get("sk")
                         if isinstance(sk_val, str):
                             rows.append(
@@ -1164,12 +1169,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 }
                             ]
                         )
-                    reply_markup = {"inline_keyboard": rows} if rows else {}
                     _send_message(
                         chat_id,
-                        "Active prescriptions:\n" + "\n".join(lines),
+                        "Active prescriptions:\n" + "\n".join(parts),
                         settings,
-                        reply_markup=reply_markup,
+                        reply_markup={"inline_keyboard": rows} if rows else {},
                     )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "reminders":
@@ -1183,8 +1187,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         int(chat_id) if isinstance(chat_id, int) else 0,
                         limit=50,
                     )
-                    rows: list[str] = []
-                    kb_rows: list[list[dict[str, str]]] = []
+                    rem_lines: list[str] = []
+                    rem_kb_rows: list[list[dict[str, str]]] = []
                     for it in items:
                         nm = it.get("medicationName")
                         times = it.get("scheduleTimes")
@@ -1192,9 +1196,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         sk_val = it.get("sk")
                         if isinstance(times, list) and times:
                             label = ", ".join([str(x) for x in times])
-                            rows.append(f"- {nm}: {label} (until {until})")
+                            rem_lines.append(f"- {nm}: {label} (until {until})")
                             if isinstance(sk_val, str):
-                                kb_rows.append(
+                                rem_kb_rows.append(
                                     [
                                         {
                                             "text": "❌ Cancel reminders",
@@ -1202,15 +1206,15 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                         }
                                     ]
                                 )
-                    if not rows:
+                    if not rem_lines:
                         _send_message(chat_id, "No active reminders.", settings)
                     else:
                         _send_message(
                             chat_id,
-                            "Your reminders:\n" + "\n".join(rows),
+                            "Your reminders:\n" + "\n".join(rem_lines),
                             settings,
-                            reply_markup={"inline_keyboard": kb_rows}
-                            if kb_rows
+                            reply_markup={"inline_keyboard": rem_kb_rows}
+                            if rem_kb_rows
                             else {},
                         )
                 except Exception:
