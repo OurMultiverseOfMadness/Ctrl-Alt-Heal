@@ -263,6 +263,34 @@ def _handle_fhir_document(
         _send_message(chat_id, "Sorry, failed to save FHIR data.", settings)
 
 
+def _tz_label(chat_id: int) -> str:
+    try:
+        from ...shared.infrastructure.identities import get_identity_by_telegram
+
+        ident_any = get_identity_by_telegram(int(chat_id))
+        ident_dict: dict[str, Any] = ident_any if isinstance(ident_any, dict) else {}
+        attrs_any = ident_dict.get("attrs")
+        attrs_dict: dict[str, Any] = attrs_any if isinstance(attrs_any, dict) else {}
+        tz_val = attrs_dict.get("timezone")
+        return str(tz_val) if isinstance(tz_val, str) and tz_val else "UTC"
+    except Exception:
+        return "UTC"
+
+
+def _format_until_local(until_iso: str, tzname: str) -> str:
+    """Return a human-readable end date in user's timezone (e.g., 18 Sep 2025)."""
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        dt = datetime.fromisoformat(until_iso.replace("Z", "+00:00"))
+        if tzname != "UTC":
+            dt = dt.astimezone(ZoneInfo(tzname))
+        return dt.strftime("%d %b %Y")
+    except Exception:
+        return until_iso
+
+
 def _auto_schedule_new_reminders(chat_id: int, settings: Settings) -> str:
     """Create reminders for prescriptions without schedules; return summary lines.
 
@@ -325,7 +353,8 @@ def _auto_schedule_new_reminders(chat_id: int, settings: Settings) -> str:
             )
             set_prescription_schedule_names(int(chat_id), sk_val, names)
             created_lines.append(
-                f"- {med_name}: {', '.join(times_local)} ({tzname}), until {until_iso}"
+                f"- {med_name}: {', '.join(times_local)} ({tzname}), until "
+                f"{_format_until_local(until_iso, tzname)}"
             )
         return "\n".join(created_lines) if created_lines else "(no new reminders)"
     except Exception:
@@ -628,7 +657,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         _send_message(
                             cb_chat_id,
                             (
-                                "Sample FHIR saved. I have set up reminders: \n"
+                                "Sample FHIR saved. I have set up reminders in "
+                                + _tz_label(cb_chat_id)
+                                + ":\n"
                                 + created_msg
                                 + (
                                     "\nUse /reminders to view or cancel, or send "
@@ -663,26 +694,40 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 )
                                 for it in items
                             ]
-                            markup = (
-                                {
-                                    "inline_keyboard": [
+                            page_rows_hist: list[list[dict[str, str]]] = []
+                            for it2 in items:
+                                nm2 = str(it2.get("medicationName"))
+                                sk2 = it2.get("sk")
+                                if isinstance(sk2, str):
+                                    page_rows_hist.append(
                                         [
                                             {
-                                                "text": "Next ▶",
-                                                "callback_data": "rx_history_next",
-                                            }
+                                                "text": f"⏰ Remind: {nm2}",
+                                                "callback_data": f"rx_remind::{sk2}",
+                                            },
+                                            {
+                                                "text": f"⏹ Stop: {nm2}",
+                                                "callback_data": f"rx_stop::{sk2}",
+                                            },
                                         ]
+                                    )
+                            if next_lek:
+                                page_rows_hist.append(
+                                    [
+                                        {
+                                            "text": "Next ▶",
+                                            "callback_data": "rx_history_next",
+                                        }
                                     ]
-                                }
-                                if next_lek
-                                else {}
-                            )
+                                )
                             _send_message(
                                 cb_chat_id,
                                 "Your prescriptions (more):\n"
                                 + "\n".join(page_lines_hist),
                                 settings,
-                                reply_markup=markup,
+                                reply_markup={"inline_keyboard": page_rows_hist}
+                                if page_rows_hist
+                                else {},
                             )
                         except Exception:
                             logger.exception("history_next_error")
@@ -710,26 +755,40 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                 )
                                 for it in items
                             ]
-                            markup = (
-                                {
-                                    "inline_keyboard": [
+                            page_rows_active: list[list[dict[str, str]]] = []
+                            for it2 in items:
+                                nm2 = str(it2.get("medicationName"))
+                                sk2 = it2.get("sk")
+                                if isinstance(sk2, str):
+                                    page_rows_active.append(
                                         [
                                             {
-                                                "text": "Next ▶",
-                                                "callback_data": "rx_active_next",
-                                            }
+                                                "text": f"⏰ Remind: {nm2}",
+                                                "callback_data": f"rx_remind::{sk2}",
+                                            },
+                                            {
+                                                "text": f"⏹ Stop: {nm2}",
+                                                "callback_data": f"rx_stop::{sk2}",
+                                            },
                                         ]
+                                    )
+                            if next_lek:
+                                page_rows_active.append(
+                                    [
+                                        {
+                                            "text": "Next ▶",
+                                            "callback_data": "rx_active_next",
+                                        }
                                     ]
-                                }
-                                if next_lek
-                                else {}
-                            )
+                                )
                             _send_message(
                                 cb_chat_id,
                                 "Active prescriptions (more):\n"
                                 + "\n".join(page_lines_active),
                                 settings,
-                                reply_markup=markup,
+                                reply_markup={"inline_keyboard": page_rows_active}
+                                if page_rows_active
+                                else {},
                             )
                         except Exception:
                             logger.exception("active_next_error")
@@ -770,11 +829,17 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             cb_chat_id, sk, times_utc, until
                         )
                         set_prescription_schedule_names(cb_chat_id, sk, names)
+                        # Convert to local for display
+                        disp_local = (
+                            ReminderScheduler.utc_times_to_local(times_utc, tzname)
+                            if tzname != "UTC"
+                            else times_raw
+                        )
                         _send_message(
                             cb_chat_id,
                             (
                                 "Reminders set at "
-                                + ", ".join(times_raw)
+                                + ", ".join(disp_local)
                                 + (f" ({tzname})" if tzname != "UTC" else " UTC")
                                 + ". Update with /reminders or send new times."
                             ),
@@ -1250,45 +1315,49 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 if not items:
                     _send_message(chat_id, "No active prescriptions.", settings)
                 else:
-                    # Per-item action rows for /active
-                    active_item_lines: list[str] = []
-                    active_item_rows: list[list[dict[str, str]]] = []
+                    # Send one message per item so buttons appear under each line
                     for it in items[:5]:
-                        active_item_lines.append(
-                            f"- {it.get('medicationName')}: "
-                            f"{it.get('dosageText') or ''}"
-                        )
+                        name_txt = str(it.get("medicationName"))
+                        dose_txt = str(it.get("dosageText") or "")
                         sk_val = it.get("sk")
+                        reply_markup: dict[str, object] = {}
                         if isinstance(sk_val, str):
-                            active_item_rows.append(
-                                [
-                                    {
-                                        "text": "⏰ Remind",
-                                        "callback_data": f"rx_remind::{sk_val}",
-                                    },
-                                    {
-                                        "text": "⏹ Stop",
-                                        "callback_data": f"rx_stop::{sk_val}",
-                                    },
+                            reply_markup = {
+                                "inline_keyboard": [
+                                    [
+                                        {
+                                            "text": f"⏰ Remind: {name_txt}",
+                                            "callback_data": f"rx_remind::{sk_val}",
+                                        },
+                                        {
+                                            "text": f"⏹ Stop: {name_txt}",
+                                            "callback_data": f"rx_stop::{sk_val}",
+                                        },
+                                    ]
                                 ]
-                            )
-                    if st.get("rx_active_lek"):
-                        active_item_rows.append(
-                            [
-                                {
-                                    "text": "Next ▶",
-                                    "callback_data": "rx_active_next",
-                                }
-                            ]
+                            }
+                        _send_message(
+                            chat_id,
+                            f"- {name_txt}: {dose_txt}",
+                            settings,
+                            reply_markup=reply_markup,
                         )
-                    _send_message(
-                        chat_id,
-                        "Active prescriptions:\n" + "\n".join(active_item_lines),
-                        settings,
-                        reply_markup={"inline_keyboard": active_item_rows}
-                        if active_item_rows
-                        else {},
-                    )
+                    if st_active.get("rx_active_lek"):
+                        _send_message(
+                            chat_id,
+                            "More items available…",
+                            settings,
+                            reply_markup={
+                                "inline_keyboard": [
+                                    [
+                                        {
+                                            "text": "Next ▶",
+                                            "callback_data": "rx_active_next",
+                                        }
+                                    ]
+                                ]
+                            },
+                        )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "reminders":
                 # List current schedules (from materialized RX items)
@@ -1296,6 +1365,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     from ...shared.infrastructure.prescriptions_store import (
                         list_prescriptions_page,
                     )
+                    from ...shared.infrastructure.scheduler import ReminderScheduler
 
                     items_tuple = list_prescriptions_page(
                         int(chat_id) if isinstance(chat_id, int) else 0,
@@ -1304,15 +1374,26 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     items = items_tuple[0] if isinstance(items_tuple, tuple) else []
                     reminder_lines: list[str] = []
                     reminder_kb_rows: list[list[dict[str, str]]] = []
+                    tz_list_label = _tz_label(
+                        int(chat_id) if isinstance(chat_id, int) else 0
+                    )
                     for it in items:
                         nm = it.get("medicationName")
                         times = it.get("scheduleTimes")
                         until = it.get("scheduleUntil")
                         sk_val = it.get("sk")
                         if isinstance(times, list) and times:
-                            label = ", ".join([str(x) for x in times])
+                            times_local = (
+                                ReminderScheduler.utc_times_to_local(
+                                    [str(x) for x in times], tz_list_label
+                                )
+                                if tz_list_label != "UTC"
+                                else [str(x) for x in times]
+                            )
+                            label = ", ".join(times_local)
+                            until_h = _format_until_local(str(until), tz_list_label)
                             reminder_lines.append(
-                                f"- {nm}: {label} (until {str(until)})"
+                                f"- {nm}: {label} ({tz_list_label}), until {until_h}"
                             )
                             if isinstance(sk_val, str):
                                 reminder_kb_rows.append(
@@ -1518,11 +1599,18 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         ReminderScheduler(settings.aws_region).create_cron_schedules(
                             int(chat_id), sk, times_utc, until
                         )
+                        disp_local2 = (
+                            ReminderScheduler.utc_times_to_local(times_utc, tzname)
+                            if tzname != "UTC"
+                            else times
+                        )
                         _send_message(
                             chat_id,
                             (
-                                "Reminders set. You can update anytime by sending "
-                                "new times."
+                                "Reminders set at "
+                                + ", ".join(disp_local2)
+                                + (f" ({tzname})" if tzname != "UTC" else " UTC")
+                                + ". You can update anytime by sending new times."
                             ),
                             settings,
                         )

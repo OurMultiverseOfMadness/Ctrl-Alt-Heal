@@ -104,3 +104,28 @@ class ReminderScheduler:
             return out
         except Exception:
             return times_hhmm
+
+    @staticmethod
+    def utc_times_to_local(times_hhmm_utc: list[str], timezone: str) -> list[str]:
+        """Convert HH:MM (UTC) to HH:MM in user's local timezone for display."""
+        try:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+
+            out: list[str] = []
+            now = datetime.utcnow()
+            for t in times_hhmm_utc:
+                hh, mm = t.split(":")
+                utc_dt = datetime(
+                    now.year,
+                    now.month,
+                    now.day,
+                    int(hh),
+                    int(mm),
+                    tzinfo=ZoneInfo("UTC"),
+                )
+                local = utc_dt.astimezone(ZoneInfo(timezone))
+                out.append(f"{local.hour:02d}:{local.minute:02d}")
+            return out
+        except Exception:
+            return times_hhmm_utc
