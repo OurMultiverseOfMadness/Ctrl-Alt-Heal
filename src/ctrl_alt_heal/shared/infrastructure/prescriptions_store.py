@@ -110,3 +110,28 @@ def set_prescription_schedule(
         ExpressionAttributeNames={"#t": "scheduleTimes", "#u": "scheduleUntil"},
         ExpressionAttributeValues={":t": times_utc_hhmm, ":u": until_iso},
     )
+
+
+def set_prescription_schedule_names(
+    chat_id: int, sk: str, schedule_names: list[str]
+) -> None:
+    _ensure_table()
+    _table.update_item(  # type: ignore[union-attr]
+        Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+        UpdateExpression="SET #n = :n",
+        ExpressionAttributeNames={"#n": "scheduleNames"},
+        ExpressionAttributeValues={":n": schedule_names},
+    )
+
+
+def clear_prescription_schedule(chat_id: int, sk: str) -> None:
+    _ensure_table()
+    _table.update_item(  # type: ignore[union-attr]
+        Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+        UpdateExpression=("REMOVE #t, #u, #n"),
+        ExpressionAttributeNames={
+            "#t": "scheduleTimes",
+            "#u": "scheduleUntil",
+            "#n": "scheduleNames",
+        },
+    )

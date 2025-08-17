@@ -655,6 +655,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         )
                         from ...shared.infrastructure.prescriptions_store import (
                             set_prescription_schedule,
+                            set_prescription_schedule_names,
                         )
                         from ...shared.infrastructure.scheduler import (
                             ReminderScheduler,
@@ -674,12 +675,19 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             else times
                         )
                         set_prescription_schedule(cb_chat_id, sk, times, until)
-                        ReminderScheduler(settings.aws_region).create_cron_schedules(
+                        sched = ReminderScheduler(settings.aws_region)
+                        names = sched.create_cron_schedules(
                             cb_chat_id, sk, times_utc, until
                         )
+                        set_prescription_schedule_names(cb_chat_id, sk, names)
                         _send_message(
                             cb_chat_id,
-                            "Reminders set. You can update by sending new times.",
+                            (
+                                "Reminders set at "
+                                + ", ".join(times)
+                                + (f" ({tzname})" if tzname != "UTC" else " UTC")
+                                + ". You can update by sending new times."
+                            ),
                             settings,
                         )
                     except Exception:
@@ -734,11 +742,24 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     sk = data.split("::", 1)[1]
                     try:
                         from ...shared.infrastructure.prescriptions_store import (
+                            clear_prescription_schedule,
+                            get_prescription,
                             list_prescriptions_page,
                             update_prescription_status,
                         )
+                        from ...shared.infrastructure.scheduler import ReminderScheduler
 
                         update_prescription_status(cb_chat_id, sk, "stopped")
+                        # If schedules exist, delete them
+                        rx = get_prescription(cb_chat_id, sk) or {}
+                        names = (
+                            rx.get("scheduleNames") if isinstance(rx, dict) else None
+                        )
+                        if isinstance(names, list) and names:
+                            ReminderScheduler(settings.aws_region).delete_schedules(
+                                [str(n) for n in names]
+                            )
+                            clear_prescription_schedule(cb_chat_id, sk)
                         # Refresh view
                         items, lek = list_prescriptions_page(
                             cb_chat_id, status="active", limit=5
@@ -1118,6 +1139,36 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         reply_markup=reply_markup,
                     )
                 return {"statusCode": 200, "body": "ok"}
+            if cmd == "reminders":
+                # List current schedules (from materialized RX items)
+                try:
+                    from ...shared.infrastructure.prescriptions_store import (
+                        list_prescriptions_page,
+                    )
+
+                    items, _ = list_prescriptions_page(
+                        int(chat_id) if isinstance(chat_id, int) else 0,
+                        limit=50,
+                    )
+                    rows: list[str] = []
+                    for it in items:
+                        nm = it.get("medicationName")
+                        times = it.get("scheduleTimes")
+                        until = it.get("scheduleUntil")
+                        if isinstance(times, list) and times:
+                            label = ", ".join([str(x) for x in times])
+                            rows.append(f"- {nm}: {label} (until {until})")
+                    if not rows:
+                        _send_message(chat_id, "No active reminders.", settings)
+                    else:
+                        _send_message(
+                            chat_id,
+                            "Your reminders:\n" + "\n".join(rows),
+                            settings,
+                        )
+                except Exception:
+                    logger.exception("reminders_list_error")
+                return {"statusCode": 200, "body": "ok"}
 
             # Control words: label / prescription / fhir
             if text_lower in {"label", "/label"}:
@@ -1283,14 +1334,22 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             else times
                         )
                         set_prescription_schedule(int(chat_id), sk, times, until)
-                        ReminderScheduler(settings.aws_region).create_cron_schedules(
+                        sched = ReminderScheduler(settings.aws_region)
+                        names = sched.create_cron_schedules(
                             int(chat_id), sk, times_utc, until
                         )
+                        from ...shared.infrastructure.prescriptions_store import (
+                            set_prescription_schedule_names,
+                        )
+
+                        set_prescription_schedule_names(int(chat_id), sk, names)
                         _send_message(
                             chat_id,
                             (
-                                "Reminders set. You can update anytime by sending "
-                                "new times."
+                                "Reminders set at "
+                                + ", ".join(times)
+                                + (f" ({tzname})" if tzname != "UTC" else " UTC")
+                                + ". You can update anytime by sending new times."
                             ),
                             settings,
                         )

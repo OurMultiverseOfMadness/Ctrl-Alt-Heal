@@ -24,10 +24,26 @@ class ReminderScheduler:
     ) -> list[str]:
         """Create one schedule per time of day; return schedule names."""
         names: list[str] = []
+
+        def _sanitize(s: str) -> str:
+            # Allow only letters, numbers, hyphen and underscore in schedule names
+            import re
+
+            return re.sub(r"[^A-Za-z0-9_-]", "_", s)
+
+        # Parse EndDate if provided
+        end_dt = None
+        if until_iso:
+            try:
+                from datetime import datetime
+
+                end_dt = datetime.fromisoformat(until_iso.replace("Z", "+00:00"))
+            except Exception:
+                end_dt = None
         for t in times_utc_hhmm:
             hh, mm = t.split(":")
             cron = f"{mm} {hh} * * ? *"  # every day at HH:MM UTC
-            name = f"rx-{chat_id}-{rx_sk.replace('#', '_')}-{hh}{mm}"
+            name = _sanitize(f"rx-{chat_id}-{rx_sk}-{hh}{mm}")
             payload = {
                 "chat_id": chat_id,
                 "rx_sk": rx_sk,
@@ -44,9 +60,18 @@ class ReminderScheduler:
                     "RoleArn": self._role_arn,
                     "Input": json.dumps(payload),
                 },
+                **({"EndDate": end_dt} if end_dt is not None else {}),
             )
             names.append(name)
         return names
+
+    def delete_schedules(self, names: list[str]) -> None:
+        for n in names:
+            try:
+                self._client.delete_schedule(Name=n, GroupName=self._group_name)
+            except Exception:
+                # Best effort
+                pass
 
     @staticmethod
     def local_times_to_utc(times_hhmm: list[str], timezone: str) -> list[str]:
