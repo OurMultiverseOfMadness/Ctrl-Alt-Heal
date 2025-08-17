@@ -101,6 +101,12 @@ def _send_message(
                                 else:
                                     out.append(ln)
                             else:
+                                # protect slash commands like /reminders
+                                def _repl_cmd(m: _re.Match[str]) -> str:
+                                    return _add_placeholder(m.group(0))
+
+                                ln2 = _re.sub(r"/[A-Za-z_]+", _repl_cmd, ln)
+
                                 # also protect patterns like "Name 20 mg"
                                 def _repl(m: _re.Match[str]) -> str:
                                     return _add_placeholder(m.group(0))
@@ -109,7 +115,7 @@ def _send_message(
                                     r"[A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+)*(?: \d+ "
                                     r"(?:mg|ml|mcg|g|units))?"
                                 )
-                                out.append(_re.sub(pat, _repl, ln))
+                                out.append(_re.sub(pat, _repl, ln2))
                         return "\n".join(out)
 
                     def _restore_text(src: str) -> str:
