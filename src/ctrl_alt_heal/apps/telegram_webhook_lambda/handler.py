@@ -66,6 +66,7 @@ def _send_message(
             if api_secret:
                 try:
                     import json as _json2
+                    import re as _re
                     from urllib.request import Request, urlopen
 
                     # secret may be raw or JSON with api_key
@@ -78,6 +79,47 @@ def _send_message(
                                 api_key = k
                     except Exception:
                         pass
+
+                    # Protect med names with placeholders then restore after
+                    placeholders: dict[str, str] = {}
+
+                    def _add_placeholder(seg: str) -> str:
+                        key = f"__P{len(placeholders)}__"
+                        placeholders[key] = seg
+                        return key
+
+                    def _protect_text(src: str) -> str:
+                        lines = src.splitlines()
+                        out: list[str] = []
+                        for ln in lines:
+                            if ln.startswith("- ") and ":" in ln:
+                                head, tail = ln[2:].split(":", 1)
+                                seg = head.strip()
+                                if seg:
+                                    ph = _add_placeholder(seg)
+                                    out.append(f"- {ph}:{tail}")
+                                else:
+                                    out.append(ln)
+                            else:
+                                # also protect patterns like "Name 20 mg"
+                                def _repl(m: _re.Match[str]) -> str:
+                                    return _add_placeholder(m.group(0))
+
+                                pat = (
+                                    r"[A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+)*(?: \d+ "
+                                    r"(?:mg|ml|mcg|g|units))?"
+                                )
+                                out.append(_re.sub(pat, _repl, ln))
+                        return "\n".join(out)
+
+                    def _restore_text(src: str) -> str:
+                        out = src
+                        for k, v in placeholders.items():
+                            out = out.replace(k, v)
+                        return out
+
+                    text_protected = _protect_text(text)
+
                     body = {
                         "model": "aisingapore/Llama-SEA-LION-v3.5-8B-R",
                         "messages": [
@@ -89,13 +131,15 @@ def _send_message(
                                     "Preserve medicine names in English. "
                                     "No transliterations (Pinyin), phonetics, "
                                     "romanization, commentary, parentheses, or "
-                                    "explanations. Output ONLY the translated text."
+                                    "explanations. Output ONLY the translated text. "
+                                    "If you see placeholders like __P0__, copy them."
                                 ),
                             },
                             {
                                 "role": "user",
                                 "content": (
-                                    f"Target language code: {lang_code}. Text: {text}"
+                                    f"Target language code: {lang_code}. Text: "
+                                    f"{text_protected}"
                                 ),
                             },
                         ],
@@ -133,7 +177,7 @@ def _send_message(
                                     else None
                                 )
                                 if isinstance(content, str) and content:
-                                    text = content
+                                    text = _restore_text(content)
                         except Exception:
                             pass
                 except Exception:
@@ -675,7 +719,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 guard_chat_id,
                 (
                     "Please set your timezone first so I can schedule reminders "
-                    "correctly. Tap ‘Set my timezone’ below or send /timezone "
+                    "correctly. Tap 'Set my timezone' below or send /timezone "
                     "Asia/Singapore."
                 ),
                 settings,
@@ -738,7 +782,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     _send_message(
                         cb_chat_id,
                         (
-                            "Please attach the FHIR JSON file here. I’ll read it and "
+                            "Please attach the FHIR JSON file here. I'll read it and "
                             "create your medication schedule."
                         ),
                         settings,
@@ -829,7 +873,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     _send_message(
                         cb_chat_id,
                         (
-                            "Please attach the FHIR JSON file here. I’ll read it and "
+                            "Please attach the FHIR JSON file here. I'll read it and "
                             "create your medication schedule."
                         ),
                         settings,
@@ -1374,7 +1418,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 _send_message(
                     chat_id,
                     (
-                        "Hi! I’m your recovery companion. I’ll help you follow your "
+                        "Hi! I'm your recovery companion. I'll help you follow your "
                         "medications on time and keep things simple.\n\n"
                         "Would you like to upload a prescription now? You can send a "
                         "photo of a label or prescription, or upload a FHIR record "
@@ -1436,11 +1480,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 _send_message(
                     chat_id,
                     (
-                        "Here’s what I can do:\n"
-                        "- Upload a label photo (single medicine) or a doctor’s "
+                        "Here's what I can do:\n"
+                        "- Upload a label photo (single medicine) or a doctor's "
                         "prescription (multiple).\n"
                         "- Upload a FHIR record from your hospital portal.\n"
-                        "- List your prescriptions and see what’s active.\n"
+                        "- List your prescriptions and see what's active.\n"
                         "- Set up reminders and adherence schedules.\n"
                         "- Set your timezone (auto-detect via location or quick-pick)"
                         " for local-time reminders.\n\n"
@@ -2134,7 +2178,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         _send_message(
             int(chat_id) if isinstance(chat_id, int) else 0,
             (
-                "Hi! I’m your recovery companion. I’ll help you follow your "
+                "Hi! I'm your recovery companion. I'll help you follow your "
                 "medications on time and keep things simple.\n\n"
                 "Would you like to upload a prescription now? You can send a "
                 "photo of a label or prescription, or upload a FHIR record from "
