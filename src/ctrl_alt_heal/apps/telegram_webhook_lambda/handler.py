@@ -20,6 +20,7 @@ from ...shared.infrastructure.fhir_store import FhirStore
 from ...shared.infrastructure.identities import (
     get_identity_by_telegram,
     link_telegram_user,
+    upsert_language_for_telegram,
     upsert_phone_for_telegram,
 )
 from ...shared.infrastructure.logger import get_logger
@@ -54,6 +55,78 @@ def _send_message(
     reply_markup: dict[str, Any] | None = None,
     reply_to_message_id: int | None = None,
 ) -> None:
+    # Optional translation via SEA LION if user prefers a non-English language
+    try:
+        ident = get_identity_by_telegram(int(chat_id)) or {}
+        attrs = ident.get("attrs") if isinstance(ident, dict) else None
+        lang = attrs.get("language") if isinstance(attrs, dict) else None
+        lang_code = str(lang) if isinstance(lang, str) and lang else "en"
+        if lang_code != "en":
+            api_secret = _get_secret(settings.sealion_secret_arn)
+            if api_secret:
+                try:
+                    import json as _json2
+                    from urllib.request import Request, urlopen
+
+                    body = {
+                        "model": "aisingapore/Llama-SEA-LION-v3.5-8B-R",
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a translator for patient-friendly health "
+                                    "messages. Translate into the user's language, "
+                                    "but preserve medicine names in English (do not "
+                                    "translate drug names)."
+                                ),
+                            },
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"Target language code: {lang_code}. Text: {text}"
+                                ),
+                            },
+                        ],
+                    }
+                    req = Request(
+                        "https://api.sea-lion.ai/v1/chat/completions",
+                        data=_json2.dumps(body).encode("utf-8"),
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {api_secret}",
+                            "accept": "text/plain",
+                        },
+                        method="POST",
+                    )
+                    with urlopen(req, timeout=6) as resp:
+                        payload_text = resp.read().decode("utf-8")
+                        try:
+                            parsed = _json2.loads(payload_text)
+                            choices = (
+                                parsed.get("choices")
+                                if isinstance(parsed, dict)
+                                else None
+                            )
+                            if isinstance(choices, list) and choices:
+                                msg = (
+                                    choices[0].get("message")
+                                    if isinstance(choices[0], dict)
+                                    else None
+                                )
+                                content = (
+                                    msg.get("content")
+                                    if isinstance(msg, dict)
+                                    else None
+                                )
+                                if isinstance(content, str) and content:
+                                    text = content
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     token = _get_bot_token(settings)
     url = f"{settings.telegram_api_url}/bot{token}/sendMessage"
     payload: dict[str, Any] = {"chat_id": chat_id, "text": text}
@@ -533,11 +606,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     except Exception:
         guard_chat_id = None
     # Allow-only list of actions that can proceed without a timezone
-    allow_wo_tz: set[str] = {
-        "/start",
-        "/help",
-        "/timezone",
-    }
+    allow_wo_tz: set[str] = {"/start", "/help", "/timezone", "/language"}
     # Extract user text (for commands) early
     text_any = message.get("text") if isinstance(message, dict) else None
     text_lower = str(text_any).strip().lower() if isinstance(text_any, str) else ""
@@ -606,6 +675,84 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         else None,
                     )
                 elif data == "upload_fhir":
+                    cb_from = callback_query.get("from") or {}
+                    uid = cb_from.get("id") if isinstance(cb_from, dict) else None
+                    if not _ensure_phone(uid, cb_chat_id, settings):
+                        return {"statusCode": 200, "body": "ok"}
+                    st = get_state(cb_chat_id)
+                    st["awaiting_fhir"] = True
+                    set_state(cb_chat_id, st)
+                    _send_message(
+                        cb_chat_id,
+                        (
+                            "Please attach the FHIR JSON file here. I’ll read it and "
+                            "create your medication schedule."
+                        ),
+                        settings,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "📄 Use sample FHIR 1",
+                                        "callback_data": "fhir_sample_1",
+                                    },
+                                    {
+                                        "text": "📄 Use sample FHIR 2",
+                                        "callback_data": "fhir_sample_2",
+                                    },
+                                ],
+                                [
+                                    {
+                                        "text": "📄 Use sample FHIR 3",
+                                        "callback_data": "fhir_sample_3",
+                                    },
+                                    {
+                                        "text": "📄 Use sample FHIR 4",
+                                        "callback_data": "fhir_sample_4",
+                                    },
+                                ],
+                            ]
+                        },
+                    )
+                elif data == "set_language":
+                    _send_message(
+                        cb_chat_id,
+                        (
+                            "Select your preferred language for replies (medicine "
+                            "names remain in English):"
+                        ),
+                        settings,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {"text": "English", "callback_data": "lang_en"},
+                                    {
+                                        "text": "Bahasa Indonesia",
+                                        "callback_data": "lang_id",
+                                    },
+                                ],
+                                [
+                                    {"text": "Malay", "callback_data": "lang_ms"},
+                                    {"text": "Thai", "callback_data": "lang_th"},
+                                ],
+                                [
+                                    {"text": "Vietnamese", "callback_data": "lang_vi"},
+                                    {"text": "Tagalog", "callback_data": "lang_tl"},
+                                ],
+                            ]
+                        },
+                    )
+                elif isinstance(data, str) and data.startswith("lang_"):
+                    lang = data.split("_", 1)[1]
+                    try:
+                        upsert_language_for_telegram(int(cb_chat_id), lang)
+                        _send_message(
+                            cb_chat_id,
+                            f"Language saved: {lang}.",
+                            settings,
+                        )
+                    except Exception:
+                        logger.exception("set_language_error")
                     cb_from = callback_query.get("from") or {}
                     uid = cb_from.get("id") if isinstance(cb_from, dict) else None
                     if not _ensure_phone(uid, cb_chat_id, settings):
@@ -1192,6 +1339,12 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                                     "callback_data": "set_timezone",
                                 }
                             ],
+                            [
+                                {
+                                    "text": "🌐 Set language",
+                                    "callback_data": "set_language",
+                                }
+                            ],
                         ]
                     },
                 )
@@ -1232,6 +1385,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         "08:00, 19:00), or tap OK to accept suggestions.\n"
                         "3) To clear and reset: go to /reminders and tap ❌ Cancel for"
                         " that item, then set new times via ⏰ Remind.\n\n"
+                        "Language:\n"
+                        "- Set your preferred language for replies. Medicine names "
+                        "stay in English.\n\n"
                         "Commands:\n"
                         "/start — show the main menu\n"
                         "/help — this help\n"
@@ -1240,6 +1396,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         "/reminders — show reminder schedules\n"
                         "/timezone [IANA_TZ] — set timezone (e.g., /timezone "
                         "Asia/Singapore)\n\n"
+                        "/language [code] — set language (e.g., /language id). "
+                        "No code shows a picker.\n\n"
                         'Tip: You can also ask, e.g. "what are my active '
                         'prescriptions?"'
                     ),
@@ -1301,6 +1459,53 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             ],
                             "resize_keyboard": True,
                             "one_time_keyboard": True,
+                        },
+                    )
+                return {"statusCode": 200, "body": "ok"}
+            if cmd == "language":
+                # /language [code]
+                lang_arg = (_args or "").strip() if isinstance(_args, str) else ""
+                if lang_arg:
+                    try:
+                        from_user = message.get("from") or {}
+                        uid = (
+                            from_user.get("id") if isinstance(from_user, dict) else None
+                        )
+                        if isinstance(uid, int):
+                            upsert_language_for_telegram(uid, lang_arg)
+                            _send_message(
+                                chat_id,
+                                f"Language saved: {lang_arg}.",
+                                settings,
+                            )
+                    except Exception:
+                        logger.exception("language_cmd_error")
+                else:
+                    _send_message(
+                        chat_id,
+                        (
+                            "Select your preferred language for replies "
+                            "(medicine names remain in English):"
+                        ),
+                        settings,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {"text": "English", "callback_data": "lang_en"},
+                                    {
+                                        "text": "Bahasa Indonesia",
+                                        "callback_data": "lang_id",
+                                    },
+                                ],
+                                [
+                                    {"text": "Malay", "callback_data": "lang_ms"},
+                                    {"text": "Thai", "callback_data": "lang_th"},
+                                ],
+                                [
+                                    {"text": "Vietnamese", "callback_data": "lang_vi"},
+                                    {"text": "Tagalog", "callback_data": "lang_tl"},
+                                ],
+                            ]
                         },
                     )
                 return {"statusCode": 200, "body": "ok"}

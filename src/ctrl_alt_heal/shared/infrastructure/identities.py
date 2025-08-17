@@ -71,3 +71,20 @@ def upsert_timezone_for_telegram(telegram_user_id: int, timezone: str) -> None:
         "attrs": attrs,
     }
     _table.put_item(Item=item)  # type: ignore[union-attr]
+
+
+def upsert_language_for_telegram(telegram_user_id: int, language: str) -> None:
+    """Store user's preferred language code in attrs.language (e.g., 'en', 'id')."""
+    _ensure_table()
+    current = get_identity_by_telegram(telegram_user_id) or {}
+    attrs = current.get("attrs") or {}
+    if not isinstance(attrs, dict):
+        attrs = {}
+    attrs["language"] = language
+    item = {
+        "pk": f"TG#{telegram_user_id}",
+        "sk": "IDENTITY",
+        "phone": current.get("phone"),
+        "attrs": attrs,
+    }
+    _table.put_item(Item=item)  # type: ignore[union-attr]
