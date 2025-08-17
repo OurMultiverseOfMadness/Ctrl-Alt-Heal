@@ -737,6 +737,28 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             set_state(cb_chat_id, st)
                     except Exception:
                         logger.exception("rx_remind_error")
+                elif isinstance(data, str) and data.startswith("rx_cancel::"):
+                    # Cancel reminders for a prescription, keep RX active
+                    sk = data.split("::", 1)[1]
+                    try:
+                        from ...shared.infrastructure.prescriptions_store import (
+                            clear_prescription_schedule,
+                            get_prescription,
+                        )
+                        from ...shared.infrastructure.scheduler import ReminderScheduler
+
+                        rx = get_prescription(cb_chat_id, sk) or {}
+                        names = (
+                            rx.get("scheduleNames") if isinstance(rx, dict) else None
+                        )
+                        if isinstance(names, list) and names:
+                            ReminderScheduler(settings.aws_region).delete_schedules(
+                                [str(n) for n in names]
+                            )
+                        clear_prescription_schedule(cb_chat_id, sk)
+                        _send_message(cb_chat_id, "Reminders cancelled.", settings)
+                    except Exception:
+                        logger.exception("rx_cancel_error")
                 elif isinstance(data, str) and data.startswith("rx_stop::"):
                     # Stop a prescription by sk, then refresh first page of active RXs
                     sk = data.split("::", 1)[1]
@@ -969,6 +991,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         "/help — this help\n"
                         "/history — recent prescriptions\n"
                         "/active — active prescriptions\n"
+                        "/reminders — show reminder schedules\n"
                         "/timezone [IANA_TZ] — set timezone (e.g., /timezone "
                         "Asia/Singapore)\n\n"
                         'Tip: You can also ask, e.g. "what are my active '
@@ -1053,31 +1076,41 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 if not items:
                     _send_message(chat_id, "No prescriptions found.", settings)
                 else:
-                    lines: list[str] = []
+                    # Per-item action rows
+                    kb_rows: list[list[dict[str, str]]] = []
+                    parts: list[str] = []
                     for it in items[:5]:
-                        lines.append(
-                            f"- {it.get('medicationName')}: "
-                            f"{it.get('dosageText') or ''}"
-                        )
-                    reply_markup = (
-                        {
-                            "inline_keyboard": [
+                        name = it.get("medicationName")
+                        dose = it.get("dosageText") or ""
+                        parts.append(f"- {name}: {dose}")
+                        sk_val = it.get("sk")
+                        if isinstance(sk_val, str):
+                            kb_rows.append(
                                 [
                                     {
-                                        "text": "Next ▶",
-                                        "callback_data": "rx_history_next",
-                                    }
+                                        "text": "⏰ Remind",
+                                        "callback_data": f"rx_remind::{sk_val}",
+                                    },
+                                    {
+                                        "text": "⏹ Stop",
+                                        "callback_data": f"rx_stop::{sk_val}",
+                                    },
                                 ]
+                            )
+                    if st.get("rx_history_lek"):
+                        kb_rows.append(
+                            [
+                                {
+                                    "text": "Next ▶",
+                                    "callback_data": "rx_history_next",
+                                }
                             ]
-                        }
-                        if st.get("rx_history_lek")
-                        else {}
-                    )
+                        )
                     _send_message(
                         chat_id,
-                        "Your prescriptions:\n" + "\n".join(lines),
+                        "Your prescriptions:\n" + "\n".join(parts),
                         settings,
-                        reply_markup=reply_markup,
+                        reply_markup={"inline_keyboard": kb_rows} if kb_rows else {},
                     )
                 return {"statusCode": 200, "body": "ok"}
             if cmd == "active":
@@ -1151,13 +1184,24 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         limit=50,
                     )
                     rows: list[str] = []
+                    kb_rows: list[list[dict[str, str]]] = []
                     for it in items:
                         nm = it.get("medicationName")
                         times = it.get("scheduleTimes")
                         until = it.get("scheduleUntil")
+                        sk_val = it.get("sk")
                         if isinstance(times, list) and times:
                             label = ", ".join([str(x) for x in times])
                             rows.append(f"- {nm}: {label} (until {until})")
+                            if isinstance(sk_val, str):
+                                kb_rows.append(
+                                    [
+                                        {
+                                            "text": "❌ Cancel reminders",
+                                            "callback_data": f"rx_cancel::{sk_val}",
+                                        }
+                                    ]
+                                )
                     if not rows:
                         _send_message(chat_id, "No active reminders.", settings)
                     else:
@@ -1165,6 +1209,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                             chat_id,
                             "Your reminders:\n" + "\n".join(rows),
                             settings,
+                            reply_markup={"inline_keyboard": kb_rows}
+                            if kb_rows
+                            else {},
                         )
                 except Exception:
                     logger.exception("reminders_list_error")
