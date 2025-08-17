@@ -246,13 +246,92 @@ def _handle_fhir_document(
         sk = store.save_bundle(chat_id, to_store)
         # materialize prescriptions for quick viewing
         materialize_prescriptions_from_bundle(chat_id, to_store, source_bundle_sk=sk)
+        # Auto-schedule reminders for newly materialized prescriptions
+        created_msg = _auto_schedule_new_reminders(chat_id, settings)
         _send_message(
-            chat_id, "FHIR record saved. I will set up reminders next.", settings
+            chat_id,
+            (
+                "FHIR record saved. I have set up reminders: \n"
+                + created_msg
+                + "\nUse /reminders to view or cancel, or send new times to update."
+            ),
+            settings,
         )
     except Exception:
         logger = get_logger(__name__)
         logger.exception("fhir_save_error")
         _send_message(chat_id, "Sorry, failed to save FHIR data.", settings)
+
+
+def _auto_schedule_new_reminders(chat_id: int, settings: Settings) -> str:
+    """Create reminders for prescriptions without schedules; return summary lines.
+
+    Uses simple heuristics to suggest local times, converts to UTC for Scheduler,
+    stores scheduleNames and scheduleTimes (UTC), and returns a user-friendly list
+    of local times with timezone label.
+    """
+    try:
+        from ...shared.infrastructure.identities import get_identity_by_telegram
+        from ...shared.infrastructure.prescriptions_store import (
+            list_prescriptions_page,
+            set_prescription_schedule,
+            set_prescription_schedule_names,
+        )
+        from ...shared.infrastructure.schedule_suggester import suggest_times_from_text
+        from ...shared.infrastructure.scheduler import ReminderScheduler
+
+        # Determine user timezone
+        ident_any = get_identity_by_telegram(int(chat_id))
+        ident_dict: dict[str, Any] = ident_any if isinstance(ident_any, dict) else {}
+        attrs_any = ident_dict.get("attrs")
+        attrs_dict: dict[str, Any] = attrs_any if isinstance(attrs_any, dict) else {}
+        tz_val = attrs_dict.get("timezone")
+        tzname = str(tz_val) if isinstance(tz_val, str) and tz_val else "UTC"
+
+        # List current prescriptions
+        items_tuple = list_prescriptions_page(int(chat_id), status="active", limit=50)
+        items = items_tuple[0] if isinstance(items_tuple, tuple) else []
+
+        created_lines: list[str] = []
+        sched = ReminderScheduler(settings.aws_region)
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            # Skip if already scheduled
+            if isinstance(it.get("scheduleTimes"), list):
+                continue
+            med_name = it.get("medicationName")
+            freq_text = it.get("frequencyText") or it.get("dosageText")
+            times_local, _reason = suggest_times_from_text(
+                str(freq_text) if isinstance(freq_text, str) else None
+            )
+            if not times_local:
+                continue
+            sk_val = it.get("sk")
+            if not isinstance(sk_val, str):
+                continue
+            # Save schedule (UTC for scheduler; local for display)
+            from datetime import UTC, datetime, timedelta
+
+            until_iso = (datetime.now(UTC) + timedelta(days=30)).isoformat()
+            times_utc = (
+                sched.local_times_to_utc(times_local, tzname)
+                if tzname != "UTC"
+                else times_local
+            )
+            set_prescription_schedule(int(chat_id), sk_val, times_utc, until_iso)
+            names = sched.create_cron_schedules(
+                int(chat_id), sk_val, times_utc, until_iso
+            )
+            set_prescription_schedule_names(int(chat_id), sk_val, names)
+            created_lines.append(
+                f"- {med_name}: {', '.join(times_local)} ({tzname}), until {until_iso}"
+            )
+        return "\n".join(created_lines) if created_lines else "(no new reminders)"
+    except Exception:
+        _log = get_logger(__name__)
+        _log.exception("auto_schedule_error")
+        return "(failed to set up reminders)"
 
 
 def _compose_single_summary(res: dict[str, Any]) -> str:
@@ -544,9 +623,18 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         materialize_prescriptions_from_bundle(
                             cb_chat_id, sample, source_bundle_sk=sk
                         )
+                        # Auto-schedule for samples too
+                        created_msg = _auto_schedule_new_reminders(cb_chat_id, settings)
                         _send_message(
                             cb_chat_id,
-                            "Sample FHIR saved. I will set up reminders next.",
+                            (
+                                "Sample FHIR saved. I have set up reminders: \n"
+                                + created_msg
+                                + (
+                                    "\nUse /reminders to view or cancel, or send "
+                                    "new times to update."
+                                )
+                            ),
                             settings,
                         )
                     except Exception:
