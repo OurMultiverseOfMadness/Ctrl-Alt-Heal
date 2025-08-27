@@ -42,3 +42,37 @@ def send_telegram_message(chat_id: str, text: str):
         logger.error("Error: TELEGRAM_SECRET_NAME environment variable not set.")
     except Exception as e:
         logger.error("An unexpected error occurred: %s", e, exc_info=True)
+
+
+def get_telegram_file_path(file_id: str) -> str | None:
+    """Gets the file path for a file_id from Telegram."""
+    logger.info("Attempting to get file path for file_id: %s", file_id)
+    try:
+        secret_name = os.environ["TELEGRAM_SECRET_NAME"]
+        secret_value = get_secret(secret_name)
+        token = secret_value.get("bot_token") or secret_value.get("value")
+
+        if not token:
+            logger.error("Error: Telegram bot token not found in secret.")
+            return None
+
+        url = f"https://api.telegram.org/bot{token}/getFile"
+        payload = {"file_id": file_id}
+
+        response = requests.get(url, params=payload, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        file_path = data.get("result", {}).get("file_path")
+        if file_path:
+            logger.info("Successfully retrieved file path: %s", file_path)
+            return file_path
+        else:
+            logger.error("Error: 'file_path' not found in Telegram API response.")
+            return None
+
+    except Exception as e:
+        logger.error(
+            "An unexpected error occurred while getting file path: %s", e, exc_info=True
+        )
+        return None

@@ -5,7 +5,7 @@ from strands import tool
 
 from ctrl_alt_heal.config import settings
 from ctrl_alt_heal.infrastructure.bedrock import Bedrock
-from .prescription_extractor import ExtractionInput
+from .prescription_extractor import extract_prescription, ExtractionInput
 
 
 @tool(
@@ -30,11 +30,16 @@ def prescription_extraction_tool(
 ) -> dict[str, Any]:
     """A tool for extracting prescription information from an image."""
     extractor = Bedrock(model_id=settings.bedrock_model_id)
-    result = extractor.extract(
-        ExtractionInput(
-            user_id=user_id,
-            s3_bucket=s3_bucket,
-            s3_key=s3_key,
-        )
+    result = extract_prescription(
+        extractor,
+        ExtractionInput(s3_bucket=s3_bucket, s3_key=s3_key),
+        user_id=user_id,
     )
-    return result.raw_json
+
+    # Return a structured dictionary with the results
+    if result.prescriptions:
+        return {
+            "status": "success",
+            "prescriptions": [p.model_dump() for p in result.prescriptions],
+        }
+    return {"status": "error", "message": "No prescriptions were extracted."}
