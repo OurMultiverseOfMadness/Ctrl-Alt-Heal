@@ -23,12 +23,15 @@ from ctrl_alt_heal.tools.prescription_extraction_tool import (
     prescription_extraction_tool,
 )
 from ctrl_alt_heal.tools.user_profile_tool import (
+    get_user_profile_tool,
+    save_user_notes_tool,
     update_user_profile_tool,
 )
+from ctrl_alt_heal.domain.models import User
 
 
 def get_agent(
-    conversation_history: ConversationHistory | None = None,
+    user: User, conversation_history: ConversationHistory | None = None
 ) -> Agent:
     """Returns a new agent instance on every invocation."""
     # Get the directory of the current file
@@ -38,14 +41,20 @@ def get_agent(
     with open(prompt_path) as f:
         system_prompt = f.read()
 
-    messages = (
-        [
-            {"role": m.role, "content": [{"text": m.content}]}
-            for m in conversation_history.history
-        ]
-        if conversation_history
-        else []
-    )
+    messages = []
+    # Prime the agent with long-term memory notes
+    if user.notes:
+        messages.append(
+            {
+                "role": "system",
+                "content": f"Here are some important notes to remember about this user: {user.notes}",
+            }
+        )
+
+    # Add the current conversation history
+    if conversation_history:
+        for m in conversation_history.history:
+            messages.append({"role": m.role, "content": [{"text": m.content}]})
 
     # Create a bedrock model instance
     bedrock_model = BedrockModel(
@@ -70,6 +79,8 @@ def get_agent(
             update_google_calendar_event_tool,
             delete_google_calendar_event_tool,
             update_user_profile_tool,
+            get_user_profile_tool,
+            save_user_notes_tool,
         ],
     )
     return agent

@@ -45,6 +45,7 @@ class User(BaseModel):
     username: str | None = None
     timezone: str | None = None
     language: str | None = None
+    notes: str | None = None  # For storing long-term preferences and facts
     created_at: str
     updated_at: str
 

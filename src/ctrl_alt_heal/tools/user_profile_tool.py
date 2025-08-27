@@ -64,3 +64,31 @@ def get_user_profile_tool(user_id: str) -> dict[str, Any]:
         return {"status": "error", "message": "User not found."}
 
     return {"status": "success", "profile": user.model_dump()}
+
+
+@tool(
+    description=(
+        "Saves or updates long-term notes and preferences about a user. "
+        "Use this to remember key facts like allergies, primary doctor, or communication style. "
+        "The notes should be a concise summary of all important facts. When updating, provide the full, complete set of notes. "
+        "Example Triggers: The user says 'My doctor is Dr. Smith', or 'Please remember I'm allergic to penicillin'."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+            "notes": {"type": "string"},
+        },
+        "required": ["user_id", "notes"],
+    },
+)
+def save_user_notes_tool(user_id: str, notes: str) -> dict[str, Any]:
+    """A tool for saving long-term user notes and preferences."""
+    users_store = UsersStore()
+    user = users_store.get_user(user_id)
+    if not user:
+        return {"status": "error", "message": "User not found."}
+
+    user.notes = notes
+    users_store.upsert_user(user)
+    return {"status": "success", "message": "User notes saved."}

@@ -25,13 +25,13 @@ logger.setLevel(logging.INFO)
 s3_client = boto3.client("s3")
 
 
-def handle_text_message(message: dict[str, Any], chat_id: str, user_id: str) -> None:
+def handle_text_message(message: dict[str, Any], chat_id: str, user: User) -> None:
     """Handles an incoming text message."""
     text = message.get("text", "")
     history_store = HistoryStore()
-    conversation_history = history_store.get_history(user_id)
+    conversation_history = history_store.get_history(user.user_id)
 
-    agent = get_agent(conversation_history)
+    agent = get_agent(user, conversation_history)
     response_obj = agent(text)
     response_str = str(response_obj)
 
@@ -42,7 +42,7 @@ def handle_text_message(message: dict[str, Any], chat_id: str, user_id: str) -> 
             tool_name = tool_call["name"]
             tool_args = tool_call["args"]
             if "user_id" not in tool_args:
-                tool_args["user_id"] = user_id
+                tool_args["user_id"] = user.user_id
             tool_function = tool_registry.get(tool_name)
             if tool_function:
                 tool_function(**tool_args)
@@ -63,7 +63,7 @@ def handle_text_message(message: dict[str, Any], chat_id: str, user_id: str) -> 
         logger.info("Finished sending message to Telegram.")
 
 
-def handle_photo_message(message: dict[str, Any], chat_id: str, user_id: str) -> None:
+def handle_photo_message(message: dict[str, Any], chat_id: str, user: User) -> None:
     """Handles an incoming photo message."""
     logger.info("Photo message detected. Starting image processing workflow.")
     uploads_bucket = os.environ["UPLOADS_BUCKET_NAME"]
@@ -103,7 +103,7 @@ def handle_photo_message(message: dict[str, Any], chat_id: str, user_id: str) ->
         return
 
     # Upload to S3
-    s3_key = f"uploads/{user_id}/{file_id}.jpg"
+    s3_key = f"uploads/{user.user_id}/{file_id}.jpg"
     try:
         logger.info("Uploading image to S3 bucket: %s, key: %s", uploads_bucket, s3_key)
         s3_client.put_object(Bucket=uploads_bucket, Key=s3_key, Body=image_bytes)
@@ -125,15 +125,15 @@ def handle_photo_message(message: dict[str, Any], chat_id: str, user_id: str) ->
     tool_function = tool_registry.get("prescription_extraction")
     if tool_function:
         extraction_result = tool_function(
-            user_id=user_id,
+            user_id=user.user_id,
             s3_bucket=uploads_bucket,
             s3_key=s3_key,
         )
 
         # Re-engage the agent with the results
         history_store = HistoryStore()
-        conversation_history = history_store.get_history(user_id)
-        agent = get_agent(conversation_history)
+        conversation_history = history_store.get_history(user.user_id)
+        agent = get_agent(user, conversation_history)
 
         if extraction_result.get("status") == "success":
             med_names = [
@@ -184,27 +184,28 @@ def handler(event: dict[str, Any], _context: Any) -> None:
         identities_store = IdentitiesStore()
         users_store = UsersStore()
         user_id = identities_store.find_user_id_by_identity("telegram", chat_id)
-
+        user = None
         if user_id:
             user = users_store.get_user(user_id)
-            if user:
-                now = datetime.now(UTC).isoformat()
-                user.first_name = chat.get("first_name")
-                user.last_name = chat.get("last_name")
-                user.username = chat.get("username")
-                user.updated_at = now
-                users_store.upsert_user(user)
+
+        if user:
+            now = datetime.now(UTC).isoformat()
+            user.first_name = chat.get("first_name")
+            user.last_name = chat.get("last_name")
+            user.username = chat.get("username")
+            user.updated_at = now
+            users_store.upsert_user(user)
         else:
             now = datetime.now(UTC).isoformat()
-            new_user = User(
+            user = User(
                 first_name=chat.get("first_name"),
                 last_name=chat.get("last_name"),
                 username=chat.get("username"),
                 created_at=now,
                 updated_at=now,
             )
-            users_store.upsert_user(new_user)
-            user_id = new_user.user_id
+            users_store.upsert_user(user)
+            user_id = user.user_id
             identity = Identity(
                 provider="telegram",
                 provider_user_id=chat_id,
@@ -215,9 +216,9 @@ def handler(event: dict[str, Any], _context: Any) -> None:
 
         # --- Route to appropriate handler ---
         if "text" in message:
-            handle_text_message(message, chat_id, user_id)
+            handle_text_message(message, chat_id, user)
         elif "photo" in message:
-            handle_photo_message(message, chat_id, user_id)
+            handle_photo_message(message, chat_id, user)
         else:
             logger.info("Received a message that is not text or a photo. Ignoring.")
             send_telegram_message(
