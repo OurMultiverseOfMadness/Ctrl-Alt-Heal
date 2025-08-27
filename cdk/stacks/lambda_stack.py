@@ -90,6 +90,7 @@ class LambdaStack(Stack):
                 "UPLOADS_BUCKET_NAME": database_stack.uploads_bucket.bucket_name,
                 "SERPER_SECRET_NAME": "CtrlAltHealSerperSecret",
                 "TELEGRAM_SECRET_NAME": "ctrl-alt-heal/telegram/bot-token",
+                "AGENT_VERSION": "3.0",  # Force a redeployment
             },
             timeout=cdk.Duration.seconds(240),
         )
