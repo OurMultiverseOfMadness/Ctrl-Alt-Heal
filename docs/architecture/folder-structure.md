@@ -1,57 +1,52 @@
-### Folder Structure (DDD + AWS Strands + Lambda/Container)
+This document outlines the folder structure of the Ctrl-Alt-Heal application.
 
-Purpose: Keep business logic clean and testable while enabling both Lambda webhook and container long-polling deployments. Agents (AWS Strands) orchestrate tools that delegate to application use cases per bounded context.
+### High-Level Structure
+
+The project is organized into several key directories, separating the application logic from the infrastructure code.
+
+```
+.
+├── cdk/               # AWS CDK Infrastructure-as-Code
+├── docs/              # Project documentation
+├── infra/             # Infrastructure-related files (e.g., Lambda Layers)
+├── src/               # Main application source code
+└── tests/             # Unit and integration tests
+```
+
+### Source Code (`src/`)
+
+The core application logic resides in `src/ctrl_alt_heal/`.
 
 ```
 src/ctrl_alt_heal/
-  apps/
-    telegram_webhook_lambda/     # API Gateway → Lambda handler
-      handler.py                 # Webhook entrypoint (stateless, idempotent)
-      di.py                      # Dependency wiring for Lambda (future)
-    telegram_bot_service/        # Container service (long polling + scheduler)
-      main.py                    # Process entrypoint
-      di.py                      # Dependency wiring for service (future)
-  agents/
-    strands/
-      agent.py                   # Strands agent shell
-      registry.py                # Tool registry
-      tools/                     # Tools that call application layer ports
-  contexts/                      # Bounded contexts (pure domain, app, infra per context)
-    prescriptions/
-      domain/                    # Entities, value objects, services, events, repos (interfaces)
-      application/               # Use cases, DTOs, commands/queries
-      infrastructure/            # Bedrock adapters, persistence, http clients, mappers
-    adherence/
-      domain/; application/; infrastructure/
-    patient_records/
-      domain/; application/; infrastructure/  # FHIR client lives here
-    appointments/
-      domain/; application/; infrastructure/
-    notifications/
-      domain/; application/; infrastructure/
-  interface/                      # Inbound adapters
-    telegram/                     # Handlers map updates → use cases/agent intents
-      handlers/
-      middlewares/
-    http/
-  shared/                         # Shared kernel (only truly shared items)
-    domain/                       # base_entity, value_objects, events
-    application/                  # buses, errors
-    infrastructure/               # logging, db utils, message bus
-  config/
-    settings.py                   # Environment-backed settings
-
-infra/
-  cdk/                            # IaC: API GW, Lambdas, DynamoDB, S3, permissions, Scheduler roles
-
-events/                           # EventBridge Scheduler templates, Step Functions (if any)
-tests/                            # Mirrors src by context and layer
-docs/architecture/                # Architecture decisions, diagrams
+├── agent/             # Defines the main Strands agent and its system prompt.
+├── config.py          # Centralized Pydantic settings configuration.
+├── domain/            # Core data models (e.g., User, Prescription, Identity).
+├── infrastructure/    # Clients for external services (AWS, Google, Telegram).
+├── tools/             # All tools available to the Strands agent.
+└── main.py            # The AWS Lambda handler entry point.
 ```
 
-Key rules:
-- Domain layer has no dependencies on infra or external SDKs.
-- Application layer defines ports (interfaces) that infra implements.
-- Agents/tools call application use cases with validated inputs; no domain mutation in handlers.
-- Webhook (Lambda) stays stateless and idempotent; containers can host long-polling + in-process schedulers when desired.
-- EventBridge Scheduler triggers Lambdas for reminders; DynamoDB is the source of truth.
+*   **`agent/`**: Contains the definition for our main `care_companion` agent, including its initialization and the system prompt that defines its persona and capabilities.
+*   **`config.py`**: Uses Pydantic's `BaseSettings` for a robust, centralized configuration system that loads settings from environment variables.
+*   **`domain/`**: Holds the Pydantic data models that define the core concepts of our application, such as `User`, `Identity`, `Prescription`, and `ConversationHistory`.
+*   **`infrastructure/`**: Contains all the modules responsible for interacting with external services. This includes our DynamoDB data stores (`UsersStore`, `IdentitiesStore`, etc.), the `TelegramClient`, and the `GoogleCalendarClient`.
+*   **`tools/`**: Each file in this directory defines a specific capability for the agent (e.g., `google_calendar_tool.py`, `user_profile_tool.py`). The `registry.py` file provides a central mapping of all available tools.
+*   **`main.py`**: The entry point for the application. This AWS Lambda handler processes incoming Telegram webhooks, manages user identity, invokes the agent, and dispatches tool calls.
+
+### Infrastructure (`cdk/`)
+
+The `cdk/` directory contains a complete AWS CDK application for deploying the entire infrastructure.
+
+```
+cdk/
+├── stacks/            # Individual CDK stacks for each part of the infrastructure.
+│   ├── api_gateway_stack.py
+│   ├── database_stack.py
+│   └── lambda_stack.py
+├── app.py             # The main entry point for the CDK application.
+├── cdk.json           # CDK configuration file.
+└── requirements.txt   # Python dependencies for the CDK app itself.
+```
+
+This setup defines the DynamoDB tables, the Lambda function, the API Gateway, and the necessary IAM roles and permissions as code, allowing for repeatable and automated deployments.

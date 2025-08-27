@@ -1,0 +1,51 @@
+import aws_cdk as cdk
+from aws_cdk import (
+    aws_dynamodb as dynamodb,
+    Stack,
+)
+from constructs import Construct
+
+
+class DatabaseStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+
+        self.users_table = self._create_table(
+            table_name="ctrl-alt-heal-users", partition_key="user_id"
+        )
+        self.identities_table = self._create_table(
+            table_name="ctrl-alt-heal-identities", partition_key="identity_key"
+        )
+        self.history_table = self._create_table(
+            table_name="ctrl-alt-heal-history", partition_key="user_id"
+        )
+        self.prescriptions_table = self._create_table(
+            table_name="ctrl-alt-heal-prescriptions",
+            partition_key="pk",
+            sort_key="sk",
+        )
+        self.fhir_table = self._create_table(
+            table_name="ctrl-alt-heal-fhir", partition_key="pk", sort_key="sk"
+        )
+
+    def _create_table(
+        self,
+        table_name: str,
+        partition_key: str,
+        sort_key: str | None = None,
+    ) -> dynamodb.Table:
+        pk = dynamodb.Attribute(name=partition_key, type=dynamodb.AttributeType.STRING)
+        sk = (
+            dynamodb.Attribute(name=sort_key, type=dynamodb.AttributeType.STRING)
+            if sort_key
+            else None
+        )
+        return dynamodb.Table(
+            self,
+            table_name,
+            table_name=table_name,
+            partition_key=pk,
+            sort_key=sk,
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=cdk.RemovalPolicy.DESTROY,  # Change for production
+        )

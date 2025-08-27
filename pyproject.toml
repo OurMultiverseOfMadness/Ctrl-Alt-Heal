@@ -1,36 +1,8 @@
-[tool.ruff]
-line-length = 88
-target-version = "py311"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "B", "W", "UP"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["ctrl_alt_heal"]
-combine-as-imports = true
-
-[tool.mypy]
-python_version = "3.11"
-strict = true
-warn_unused_ignores = true
-disallow_untyped_defs = true
-exclude = ["^docs/", "^tests/fixtures/", "^infra/cdk/cdk.out/"]
-ignore_missing_imports = true
-namespace_packages = true
-explicit_package_bases = true
-
-[tool.ruff.lint.per-file-ignores]
-"tests/fixtures/**/*" = ["E501"]
-
 [tool.pytest.ini_options]
+pythonpath = [
+  "src",
+]
 testpaths = [
-  "tests",
+    "tests",
 ]
-norecursedirs = [
-  ".git",
-  ".venv",
-  "node_modules",
-  "infra",
-  "cdk.out",
-]
-addopts = "-q"
+addopts = "--import-mode=importlib --rootdir=."
