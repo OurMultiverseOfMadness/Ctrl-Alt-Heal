@@ -9,8 +9,9 @@ from typing import Any, ClassVar
 import boto3
 import logging
 
-from ctrl_alt_heal.domain.models import ExtractionInput, ExtractionResult
 from ctrl_alt_heal.tools.prescription_extractor import (
+    ExtractionInput,
+    ExtractionResult,
     PrescriptionExtractor,
 )
 
