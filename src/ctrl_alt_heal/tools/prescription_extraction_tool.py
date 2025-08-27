@@ -10,7 +10,11 @@ from .prescription_extractor import ExtractionInput
 
 @tool(
     name="prescription_extraction",
-    description="Extracts prescription information from an image and stores it.",
+    description=(
+        "Use this tool ONLY when a user has a NEW prescription and has provided an IMAGE to be processed. "
+        "This tool extracts prescription details from an image file in an S3 bucket and stores them. "
+        "Example Triggers: 'Can you read this prescription for me?', 'I have a picture of a new prescription to add.'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {

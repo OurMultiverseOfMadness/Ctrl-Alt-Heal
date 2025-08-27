@@ -9,7 +9,12 @@ from ctrl_alt_heal.infrastructure.secrets import get_secret
 
 @tool(
     name="search",
-    description="Searches for information on the web.",
+    description=(
+        "Searches the public web for general information, typically about medications. "
+        "Use this to answer questions about what a drug is, its side effects, or common dosages. "
+        "Do NOT use this to find user-specific information. "
+        "Example Triggers: 'What is Metformin?', 'Tell me about the side effects of Lisinopril.'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {"query": {"type": "string"}},

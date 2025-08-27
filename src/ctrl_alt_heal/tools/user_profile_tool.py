@@ -8,7 +8,11 @@ from ctrl_alt_heal.infrastructure.users_store import UsersStore
 
 
 @tool(
-    description="Updates a user's profile information, such as timezone or language.",
+    description=(
+        "Updates a user's profile with non-medical information. "
+        "This is for saving user preferences like timezone or preferred language. "
+        "Example Triggers: 'My timezone is EST', 'Please speak to me in Spanish.'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {
@@ -38,7 +42,12 @@ def update_user_profile_tool(
 
 
 @tool(
-    description="Retrieves a user's profile information.",
+    description=(
+        "Retrieves the user's complete profile, including stored prescriptions, appointments, "
+        "and personal details like timezone. This should be your FIRST step for almost any "
+        "question about the user's existing data. "
+        "Example Triggers: 'What are my prescriptions?', 'Do I have any appointments?', 'What timezone do you have for me?'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {

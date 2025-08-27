@@ -7,7 +7,11 @@ from ctrl_alt_heal.infrastructure.users_store import UsersStore
 
 
 @tool(
-    description="Creates a new event in the user's Google Calendar.",
+    name="create_google_calendar_event",
+    description=(
+        "Creates a new appointment or event in the user's Google Calendar. "
+        "Example Triggers: 'Schedule a doctor's appointment for Tuesday at 2pm', 'Remind me to pick up my prescription tomorrow.'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {
@@ -29,7 +33,12 @@ def create_google_calendar_event_tool(
 
 
 @tool(
-    description="Lists events from the user's Google Calendar.",
+    name="list_google_calendar_events",
+    description=(
+        "Lists upcoming appointments and events from the user's Google Calendar. "
+        "Use this to answer questions about their schedule. "
+        "Example Triggers: 'What appointments do I have this week?', 'When is my next doctor's visit?'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {
@@ -50,7 +59,12 @@ def list_google_calendar_events_tool(
 
 
 @tool(
-    description="Updates an event in the user's Google Calendar.",
+    name="update_google_calendar_event",
+    description=(
+        "Updates an existing appointment or event in the user's Google Calendar. "
+        "You MUST have the event_id to update an event. "
+        "Example Triggers: 'Reschedule my Tuesday appointment to Wednesday', 'My appointment time has changed.'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {
@@ -73,7 +87,12 @@ def update_google_calendar_event_tool(
 
 
 @tool(
-    description="Deletes an event from the user's Google Calendar.",
+    name="delete_google_calendar_event",
+    description=(
+        "Deletes an existing appointment or event from the user's Google Calendar. "
+        "You MUST have the event_id to delete an event. "
+        "Example Triggers: 'Cancel my appointment on Tuesday', 'I don't need that reminder anymore.'"
+    ),
     inputSchema={
         "type": "object",
         "properties": {"user_id": {"type": "string"}, "event_id": {"type": "string"}},
