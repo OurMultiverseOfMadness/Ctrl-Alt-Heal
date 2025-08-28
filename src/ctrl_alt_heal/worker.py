@@ -72,9 +72,36 @@ def process_agent_response(
                         f"Tool '{tool_name}' executed successfully. Result: {result}"
                     )
                     # Format the result for the agent
-                    tool_results.append(
-                        {"tool_result_id": tool_call_id, "content": json.dumps(result)}
-                    )
+                    # For prescription extraction, provide a more natural response format
+                    if tool_name == "prescription_extraction" and isinstance(
+                        result, dict
+                    ):
+                        if result.get("status") == "success":
+                            # Format success response more naturally
+                            content = f"SUCCESS: {result.get('message', 'Prescription extracted successfully')}. "
+                            if result.get("prescriptions"):
+                                content += (
+                                    f"Found {result.get('count', 0)} medication(s): "
+                                )
+                                for i, med in enumerate(result["prescriptions"], 1):
+                                    content += f"{i}. {med.get('name', 'Unknown')} - {med.get('dosage', 'Not specified')}, {med.get('frequency', 'Not specified')}. "
+                            tool_results.append(
+                                {"tool_result_id": tool_call_id, "content": content}
+                            )
+                        else:
+                            # Format error response
+                            content = f"ERROR: {result.get('message', 'Failed to extract prescription')}"
+                            tool_results.append(
+                                {"tool_result_id": tool_call_id, "content": content}
+                            )
+                    else:
+                        # Default JSON formatting for other tools
+                        tool_results.append(
+                            {
+                                "tool_result_id": tool_call_id,
+                                "content": json.dumps(result),
+                            }
+                        )
                 except Exception as e:
                     logger.error(f"Error executing tool {tool_name}: {e}")
                     tool_results.append(

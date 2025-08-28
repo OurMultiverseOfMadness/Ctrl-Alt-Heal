@@ -37,8 +37,22 @@ def prescription_extraction_tool(
 
     # Return a structured dictionary with the results
     if result.prescriptions:
+        prescription_data = [p.model_dump() for p in result.prescriptions]
         return {
             "status": "success",
-            "prescriptions": [p.model_dump() for p in result.prescriptions],
+            "message": f"Successfully extracted {len(result.prescriptions)} prescription(s) from the image and saved them to your profile.",
+            "prescriptions": prescription_data,
+            "count": len(result.prescriptions),
+            "extraction_summary": {
+                "total_medications": len(result.prescriptions),
+                "medication_names": [p.name for p in result.prescriptions],
+                "extraction_confidence": result.confidence or 0.5,
+            },
         }
-    return {"status": "error", "message": "No prescriptions were extracted."}
+
+    return {
+        "status": "error",
+        "message": "No prescriptions were extracted from the image. Please ensure the image contains a clear prescription document.",
+        "prescriptions": [],
+        "count": 0,
+    }
