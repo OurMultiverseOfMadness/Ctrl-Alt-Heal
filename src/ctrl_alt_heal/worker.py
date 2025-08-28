@@ -76,6 +76,9 @@ def process_agent_response(
                     if tool_name == "prescription_extraction" and isinstance(
                         result, dict
                     ):
+                        logger.info(
+                            f"Processing prescription_extraction result: {result}"
+                        )
                         if result.get("status") == "success":
                             # Format success response more naturally
                             content = f"SUCCESS: {result.get('message', 'Prescription extracted successfully')}. "
@@ -85,12 +88,14 @@ def process_agent_response(
                                 )
                                 for i, med in enumerate(result["prescriptions"], 1):
                                     content += f"{i}. {med.get('name', 'Unknown')} - {med.get('dosage', 'Not specified')}, {med.get('frequency', 'Not specified')}. "
+                            logger.info(f"Formatted success content: {content}")
                             tool_results.append(
                                 {"tool_result_id": tool_call_id, "content": content}
                             )
                         else:
                             # Format error response
                             content = f"ERROR: {result.get('message', 'Failed to extract prescription')}"
+                            logger.info(f"Formatted error content: {content}")
                             tool_results.append(
                                 {"tool_result_id": tool_call_id, "content": content}
                             )
@@ -127,8 +132,23 @@ def process_agent_response(
         # No more tool calls, we have the final response
         logger.info("No tool calls detected. Processing as final response.")
         final_message = str(agent_response_obj)
+
+        # Clean up XML-like tags from the response
         if "</thinking>" in final_message:
             final_message = final_message.split("</thinking>")[-1].strip()
+
+        # Remove <response> tags if present
+        if "<response>" in final_message and "</response>" in final_message:
+            final_message = (
+                final_message.replace("<response>", "")
+                .replace("</response>", "")
+                .strip()
+            )
+
+        # Remove any other XML-like tags that might be present
+        import re
+
+        final_message = re.sub(r"<[^>]+>", "", final_message).strip()
 
         history.history.append(Message(role="assistant", content=final_message))
         HistoryStore().save_history(history)
@@ -202,6 +222,8 @@ def handle_photo_message(
 
     # Invoke the agent
     agent = get_agent(user, history)
+    logger.info("Agent created successfully")
+
     agent_response_obj = agent()
     logger.info(f"Raw agent response: {agent_response_obj}")
 
