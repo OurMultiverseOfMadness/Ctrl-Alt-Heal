@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import base64
 import json
 import os
 from dataclasses import dataclass
 from typing import Any, ClassVar
+import copy
 
 import boto3
 import logging
@@ -14,6 +14,7 @@ from ctrl_alt_heal.tools.prescription_extractor import (
     ExtractionResult,
     PrescriptionExtractor,
 )
+from ctrl_alt_heal.domain.models import Prescription
 
 
 @dataclass
@@ -40,28 +41,21 @@ class Bedrock(PrescriptionExtractor):
             image_format = "jpeg"
         obj = s3.get_object(Bucket=data.s3_bucket, Key=data.s3_key)
         img_bytes = obj["Body"].read()
-        b64 = base64.b64encode(img_bytes).decode("ascii")
 
         prompt_text = (
             "Extract medications as JSON: "
             "medications:[{name,dosage,frequency,route,duration_days}], "
             "patient_name, doctor_name."
         )
+        system_prompt = (
+            "You are a clinical pharmacist. "
+            "Reply ONLY valid JSON. "
+            "Schema: {medications:[{name:string,dosage:string,"
+            "frequency:string,route?:string,"
+            "duration_days?:number}],"
+            "patient_name?:string,doctor_name?:string}."
+        )
         request_body = {
-            # Nova: supply system instruction via top-level "system" key,
-            # do not use a "system" role inside messages.
-            "system": [
-                {
-                    "text": (
-                        "You are a clinical pharmacist. "
-                        "Reply ONLY valid JSON. "
-                        "Schema: {medications:[{name:string,dosage:string,"
-                        "frequency:string,route?:string,"
-                        "duration_days?:number}],"
-                        "patient_name?:string,doctor_name?:string}."
-                    )
-                }
-            ],
             "messages": [
                 {
                     "role": "user",
@@ -69,7 +63,7 @@ class Bedrock(PrescriptionExtractor):
                         {
                             "image": {
                                 "format": image_format,
-                                "source": {"bytes": b64},
+                                "source": {"bytes": img_bytes},
                             }
                         },
                         {"text": prompt_text},
@@ -82,7 +76,7 @@ class Bedrock(PrescriptionExtractor):
         # Optional debug logging of Bedrock inputs (sanitized)
         if os.getenv("BEDROCK_DEBUG_IO") == "1":
             try:
-                redacted = json.loads(json.dumps(request_body))
+                redacted = copy.deepcopy(request_body)
                 redacted["messages"][0]["content"][0]["image"]["source"]["bytes"] = (
                     "<redacted>"
                 )
@@ -91,16 +85,15 @@ class Bedrock(PrescriptionExtractor):
             except Exception:
                 logger.info("bedrock_io_input")
 
-        body = json.dumps(request_body)
         logger.info("bedrock_invoke")
         try:
-            resp = runtime.invoke_model(
+            resp = runtime.converse(
                 modelId=self.model_id,
-                accept="application/json",
-                contentType="application/json",
-                body=body,
+                system=[{"text": system_prompt}],
+                messages=request_body["messages"],
+                inferenceConfig=request_body["inferenceConfig"],
             )
-            payload = resp["body"].read().decode()
+            payload = resp["output"]["message"]["content"][0]["text"]
             if os.getenv("BEDROCK_DEBUG_IO") == "1":
                 logger.info(
                     "bedrock_io_output preview=%s len=%d", payload[:2000], len(payload)
@@ -108,16 +101,7 @@ class Bedrock(PrescriptionExtractor):
             # Parse Nova response and extract the assistant text which should be JSON
             extracted: dict[str, Any] | None = None
             try:
-                outer = json.loads(payload)
-                content = (
-                    (outer.get("output") or {}).get("message", {}).get("content", [])
-                )
-                text_blob: str | None = None
-                if isinstance(content, list):
-                    for part in content:
-                        if isinstance(part, dict) and isinstance(part.get("text"), str):
-                            text_blob = part.get("text")
-                            break
+                text_blob = payload
                 if isinstance(text_blob, str):
                     try:
                         extracted = json.loads(text_blob)
@@ -132,10 +116,35 @@ class Bedrock(PrescriptionExtractor):
                             except Exception:
                                 pass
                 if extracted is None:
-                    extracted = outer
+                    extracted = {"raw": payload}
+                logger.info(f"Extracted prescription data: {extracted}")
             except Exception:
                 extracted = {"raw": payload}
-            return ExtractionResult(raw_json=extracted, confidence=0.5)
+
+            # Manually parse the raw JSON to create Prescription objects
+            prescriptions = []
+            if extracted and "prescriptions" in extracted:
+                prescription_list = extracted["prescriptions"]
+                if isinstance(prescription_list, list):
+                    # Get the set of valid field names from the Prescription model
+                    valid_fields = set(Prescription.model_fields.keys())
+                    for p_data in prescription_list:
+                        # Filter the dictionary from the LLM to only include valid fields
+                        filtered_data = {
+                            k: v for k, v in p_data.items() if k in valid_fields
+                        }
+                        # Capture any extra fields
+                        extra_fields = {
+                            k: v for k, v in p_data.items() if k not in valid_fields
+                        }
+                        if extra_fields:
+                            filtered_data["extra_fields"] = extra_fields
+                        # Pydantic will validate the data here
+                        prescriptions.append(Prescription(**filtered_data))
+
+            return ExtractionResult(
+                raw_json=extracted, confidence=0.5, prescriptions=prescriptions
+            )
         except Exception:  # pragma: no cover
             logger.exception("bedrock_invoke_error")
             raise

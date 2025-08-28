@@ -23,7 +23,7 @@ class IdentitiesStore:
         """Finds an internal user_id based on an external identity."""
         try:
             composite_key = f"{provider}#{provider_user_id}"
-            response = self.table.get_item(Key={"identity_key": composite_key})
+            response = self.table.get_item(Key={"pk": composite_key})
             if "Item" in response:
                 return response["Item"]["user_id"]
             return None
@@ -34,11 +34,6 @@ class IdentitiesStore:
     def link_identity(self, identity: Identity) -> None:
         """Creates a new identity link in DynamoDB."""
         identity.created_at = datetime.now(UTC).isoformat()
-        composite_key = f"{identity.provider}#{identity.provider_user_id}"
-        self.table.put_item(
-            Item={
-                "identity_key": composite_key,
-                "user_id": identity.user_id,
-                "created_at": identity.created_at,
-            }
-        )
+        if not identity.pk:
+            identity.pk = f"{identity.provider}#{identity.provider_user_id}"
+        self.table.put_item(Item=identity.model_dump())

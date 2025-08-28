@@ -59,15 +59,24 @@ class LambdaStack(Stack):
                 resources=["*"],  # Be more specific in production
             )
         )
+        # Grant the Lambda function permissions to invoke the Bedrock model
         worker_role.add_to_policy(
             iam.PolicyStatement(
-                actions=[
-                    "bedrock:InvokeModel",
-                    "bedrock:InvokeModelWithResponseStream",
-                ],
+                actions=["bedrock:InvokeModel"],
                 resources=["*"],
             )
         )
+
+        # Grant the Lambda function permissions to read from the S3 bucket
+        worker_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["s3:GetObject"],
+                resources=[
+                    f"arn:aws:s3:::{database_stack.uploads_bucket.bucket_name}/*"
+                ],
+            )
+        )
+
         # Grant SQS permissions to the worker role
         sqs_stack.messages_queue.grant_consume_messages(worker_role)
 

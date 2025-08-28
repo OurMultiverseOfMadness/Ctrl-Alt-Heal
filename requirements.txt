@@ -1,8 +1,29 @@
-pydantic>=2.11.7
-strands-agents>=1.4.0
-ics
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-pytz
+--prefer-binary
+--extra-index-url https://pypi.org/simple
+--extra-index-url https://pypi.nvidia.com
+boto3
+botocore
+pydantic
+pydantic-settings
+strands
 requests
+python-dotenv
+pytz
+boto3-stubs[secretsmanager]
+Faker
+freezegun
+moto
+pytest
+ruff
+requests
+uuid
+coverage
+aws-cdk-lib
+constructs
+werkzeug
+numpy
+uvicorn
+fastapi
+pydantic
+uvloop
+httptools

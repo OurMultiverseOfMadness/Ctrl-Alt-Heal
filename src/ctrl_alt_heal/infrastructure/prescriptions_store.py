@@ -47,7 +47,7 @@ class PrescriptionsStore:
 
     def list_prescriptions_page(
         self,
-        chat_id: int,
+        user_id: str,
         *,
         status: str | None = None,
         limit: int = 10,
@@ -57,7 +57,7 @@ class PrescriptionsStore:
         assert self._table is not None
         kwargs: dict[str, Any] = {
             "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(
-                f"CHAT#{chat_id}"
+                f"USER#{user_id}"
             ),
             "Limit": limit,
         }
@@ -71,58 +71,58 @@ class PrescriptionsStore:
 
     def list_prescriptions(
         self,
-        chat_id: int,
+        user_id: str,
         status: str | None = None,
         limit: int = 10,
         last_evaluated_key: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         items, _ = self.list_prescriptions_page(
-            chat_id, status=status, limit=limit, last_evaluated_key=last_evaluated_key
+            user_id, status=status, limit=limit, last_evaluated_key=last_evaluated_key
         )
         return items
 
-    def update_prescription_status(self, chat_id: int, sk: str, status: str) -> None:
+    def update_prescription_status(self, user_id: str, sk: str, status: str) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+            Key={"pk": f"USER#{user_id}", "sk": sk},
             UpdateExpression="SET #s = :s",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":s": status},
         )
 
-    def get_prescription(self, chat_id: int, sk: str) -> dict[str, Any] | None:
+    def get_prescription(self, user_id: str, sk: str) -> dict[str, Any] | None:
         self._ensure_table()
         assert self._table is not None
-        resp = self._table.get_item(Key={"pk": f"CHAT#{chat_id}", "sk": sk})
+        resp = self._table.get_item(Key={"pk": f"USER#{user_id}", "sk": sk})
         item = resp.get("Item") if isinstance(resp, dict) else None
         return item if isinstance(item, dict) else None
 
     def set_prescription_schedule(
-        self, chat_id: int, sk: str, times_utc_hhmm: list[str], until_iso: str
+        self, user_id: str, sk: str, times_utc_hhmm: list[str], until_iso: str
     ) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+            Key={"pk": f"USER#{user_id}", "sk": sk},
             UpdateExpression="SET #t = :t, #u = :u",
             ExpressionAttributeNames={"#t": "scheduleTimes", "#u": "scheduleUntil"},
             ExpressionAttributeValues={":t": times_utc_hhmm, ":u": until_iso},
         )
 
     def set_prescription_schedule_names(
-        self, chat_id: int, sk: str, schedule_names: list[str]
+        self, user_id: str, sk: str, schedule_names: list[str]
     ) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+            Key={"pk": f"USER#{user_id}", "sk": sk},
             UpdateExpression="SET #n = :n",
             ExpressionAttributeNames={"#n": "scheduleNames"},
             ExpressionAttributeValues={":n": schedule_names},
         )
 
-    def clear_prescription_schedule(self, chat_id: int, sk: str) -> None:
+    def clear_prescription_schedule(self, user_id: str, sk: str) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"CHAT#{chat_id}", "sk": sk},
+            Key={"pk": f"USER#{user_id}", "sk": sk},
             UpdateExpression=("REMOVE #t, #u, #n"),
             ExpressionAttributeNames={
                 "#t": "scheduleTimes",

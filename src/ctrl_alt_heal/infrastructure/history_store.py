@@ -4,6 +4,7 @@ import os
 
 import boto3
 from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key
 
 from ctrl_alt_heal.domain.models import ConversationHistory
 
@@ -21,12 +22,16 @@ class HistoryStore:
         """Saves the conversation history to DynamoDB."""
         self.table.put_item(Item=history.model_dump())
 
-    def get_history(self, user_id: str) -> ConversationHistory:
-        """Retrieves the conversation history from DynamoDB."""
+    def get_latest_history(self, user_id: str) -> ConversationHistory | None:
+        """Retrieves the most recent conversation history session from DynamoDB."""
         try:
-            response = self.table.get_item(Key={"user_id": user_id})
-            if "Item" in response:
-                return ConversationHistory(**response["Item"])
+            response = self.table.query(
+                KeyConditionExpression=Key("user_id").eq(user_id),
+                ScanIndexForward=False,  # Sort descending to get the latest
+                Limit=1,
+            )
+            if response.get("Items"):
+                return ConversationHistory(**response["Items"][0])
         except ClientError as e:
             print(f"Could not get history for {user_id}: {e}")
-        return ConversationHistory(user_id=user_id)
+        return None

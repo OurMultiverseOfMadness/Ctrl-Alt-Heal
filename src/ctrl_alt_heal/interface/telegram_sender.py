@@ -1,9 +1,9 @@
 import logging
-import os
 
 import requests
 
 from ctrl_alt_heal.infrastructure.secrets import get_secret
+from ctrl_alt_heal.config import settings
 
 # Set up logging
 logger = logging.getLogger()
@@ -14,7 +14,7 @@ def send_telegram_message(chat_id: str, text: str):
     """Sends a message to a Telegram chat."""
     logger.info("Attempting to send message to chat_id: %s", chat_id)
     try:
-        secret_name = os.environ["TELEGRAM_SECRET_NAME"]
+        secret_name = settings.telegram_secret_name
         logger.info("Fetching secret from Secrets Manager: %s", secret_name)
 
         secret_value = get_secret(secret_name)
@@ -48,7 +48,7 @@ def get_telegram_file_path(file_id: str) -> str | None:
     """Gets the file path for a file_id from Telegram."""
     logger.info("Attempting to get file path for file_id: %s", file_id)
     try:
-        secret_name = os.environ["TELEGRAM_SECRET_NAME"]
+        secret_name = settings.telegram_secret_name
         secret_value = get_secret(secret_name)
         token = secret_value.get("bot_token") or secret_value.get("value")
 

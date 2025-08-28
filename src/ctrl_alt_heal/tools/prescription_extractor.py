@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 
 from ctrl_alt_heal.domain.models import Prescription
 from ctrl_alt_heal.infrastructure.prescriptions_store import PrescriptionsStore
+from ctrl_alt_heal.infrastructure.fhir_store import FhirStore
+import uuid
+from datetime import datetime
 
 
 class ExtractionResult(BaseModel):  # type: ignore[misc]
@@ -33,22 +36,68 @@ def extract_prescription(
     user_id: str,
 ) -> ExtractionResult:
     result = extractor.extract(data)
-    # TODO: This is a simplistic mapping from raw JSON to structured data.
-    # A more robust implementation would use a mapping layer and handle
-    # variations in the extractor's output format.
-    if result.raw_json:
-        prescriptions = result.raw_json.get("prescriptions", [])
-        result.prescriptions = [Prescription(**p) for p in prescriptions]
+    # The result from the extractor now contains parsed Prescription objects.
+    # We can use them directly to save to the database.
+    if result.prescriptions:
+        prescriptions_store = PrescriptionsStore()
+        fhir_store = FhirStore()
+
         for p in result.prescriptions:
-            # TODO: This is a placeholder for a more robust implementation
-            # that would handle chat_id and other context.
-            PrescriptionsStore().save_prescription(
+            # Save to the primary prescriptions table
+            prescriptions_store.save_prescription(
                 user_id=user_id,
                 name=p.name,
                 dosage_text=p.dosage,
                 frequency_text=p.frequency,
                 status="active",
-                source_bundle_sk=None,
+                source_bundle_sk=None,  # We'll update this later
                 start_iso=None,
             )
+
+            # Construct and save a corresponding FHIR bundle
+            fhir_bundle = _create_fhir_bundle(p, user_id)
+            fhir_store.save_bundle(user_id=user_id, bundle=fhir_bundle)
+
+            # TODO: Link the prescription to the fhir bundle by updating the sourceBundleSK
+
     return result
+
+
+def _create_fhir_bundle(prescription: Prescription, user_id: str) -> dict[str, Any]:
+    """Creates a FHIR Bundle with a MedicationRequest resource."""
+    medication_request_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat() + "Z"
+
+    return {
+        "resourceType": "Bundle",
+        "id": str(uuid.uuid4()),
+        "meta": {"lastUpdated": now},
+        "type": "transaction",
+        "entry": [
+            {
+                "fullUrl": f"urn:uuid:{medication_request_id}",
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "id": medication_request_id,
+                    "status": "active",
+                    "intent": "order",
+                    "medicationCodeableConcept": {"text": prescription.name},
+                    "subject": {"reference": f"Patient/{user_id}"},
+                    "authoredOn": now,
+                    "dosageInstruction": [
+                        {
+                            "text": f"{prescription.dosage}, {prescription.frequency}",
+                            "timing": {
+                                "repeat": {
+                                    "frequency": 1,
+                                    "period": 1,
+                                    "periodUnit": "d",
+                                }
+                            },  # Placeholder
+                        }
+                    ],
+                },
+                "request": {"method": "POST", "url": "MedicationRequest"},
+            }
+        ],
+    }

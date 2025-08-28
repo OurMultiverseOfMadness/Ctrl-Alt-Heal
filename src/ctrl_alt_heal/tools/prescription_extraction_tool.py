@@ -11,9 +11,8 @@ from .prescription_extractor import extract_prescription, ExtractionInput
 @tool(
     name="prescription_extraction",
     description=(
-        "Use this tool ONLY when a user has a NEW prescription and has provided an IMAGE to be processed. "
-        "This tool extracts prescription details from an image file in an S3 bucket and stores them. "
-        "Example Triggers: 'Can you read this prescription for me?', 'I have a picture of a new prescription to add.'"
+        "Use this tool ONLY after you have already confirmed that an image contains a prescription by using the 'describe_image' tool first. "
+        "This tool extracts structured prescription details from an image file in an S3 bucket and stores them."
     ),
     inputSchema={
         "type": "object",
@@ -29,7 +28,7 @@ def prescription_extraction_tool(
     s3_bucket: str, s3_key: str, user_id: str
 ) -> dict[str, Any]:
     """A tool for extracting prescription information from an image."""
-    extractor = Bedrock(model_id=settings.bedrock_model_id)
+    extractor = Bedrock(model_id=settings.bedrock_multimodal_model_id)
     result = extract_prescription(
         extractor,
         ExtractionInput(s3_bucket=s3_bucket, s3_key=s3_key),

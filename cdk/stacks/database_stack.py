@@ -27,15 +27,15 @@ class DatabaseStack(Stack):
             table_name="ctrl-alt-heal-users", partition_key="user_id"
         )
         self.identities_table = self._create_table(
-            table_name="ctrl-alt-heal-identities", partition_key="identity_key"
+            table_name="ctrl-alt-heal-identities", partition_key="pk"
         )
         self.history_table = self._create_table(
-            table_name="ctrl-alt-heal-history", partition_key="user_id"
+            table_name="ctrl-alt-heal-history",
+            partition_key="user_id",
+            sort_key="session_id",
         )
         self.prescriptions_table = self._create_table(
-            table_name="ctrl-alt-heal-prescriptions",
-            partition_key="pk",
-            sort_key="sk",
+            table_name="ctrl-alt-heal-prescriptions", partition_key="pk", sort_key="sk"
         )
         self.fhir_table = self._create_table(
             table_name="ctrl-alt-heal-fhir", partition_key="pk", sort_key="sk"

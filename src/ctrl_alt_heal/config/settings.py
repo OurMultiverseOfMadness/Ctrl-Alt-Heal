@@ -1,63 +1,31 @@
-from __future__ import annotations
+from pydantic_settings import BaseSettings
+import logging
 
-import os
-from dataclasses import dataclass
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class Settings:
-    telegram_bot_token: str
-    aws_region: str
-    bedrock_model_id: str
-    fhir_server_url: str | None = None
-    bedrock_region: str | None = None
-    bedrock_chat_model_id: str | None = None
-    bedrock_extract_model_id: str | None = None
-    bedrock_api_token: str | None = None
+class Settings(BaseSettings):
+    bedrock_model_id: str = "apac.amazon.nova-lite-v1:0"
+    bedrock_multimodal_model_id: str = "apac.amazon.nova-lite-v1:0"
+    google_client_secrets_file: str = "client_secret.json"
+    google_redirect_uri: str = "https://your-redirect-uri.com/oauth2callback"
+    database_table_name: str = ""
+    uploads_bucket_name: str
+    telegram_secret_name: str
 
-    # Telegram + Secrets
-    telegram_api_url: str = "https://api.telegram.org"
-    telegram_bot_token_secret_arn: str | None = None
-    telegram_webhook_secret_arn: str | None = None
+    class Config:
+        env_file = ".env"
+        # Allow reading from environment variables as a fallback
+        env_file_encoding = "utf-8"
 
-    # Storage
-    docs_bucket: str | None = None
 
-    # Scheduler wiring
-    schedule_group: str = "ctrl-alt-heal-reminders"
-    reminder_target_arn: str | None = None
-    scheduler_role_arn: str | None = None
-    # FHIR persistence
-    fhir_table_name: str | None = None
-    # SEA LION translation
-    sealion_secret_arn: str | None = None
+settings = Settings()
 
-    @staticmethod
-    def load() -> Settings:
-        return Settings(
-            telegram_bot_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""),
-            aws_region=os.environ.get("AWS_REGION", "ap-southeast-1"),
-            bedrock_model_id=os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-1"),
-            fhir_server_url=os.environ.get("FHIR_SERVER_URL"),
-            bedrock_region=os.environ.get("BEDROCK_REGION"),
-            bedrock_chat_model_id=os.environ.get(
-                "BEDROCK_CHAT_MODEL_ID", "amazon.nova-lite-v1"
-            ),
-            bedrock_extract_model_id=os.environ.get(
-                "BEDROCK_EXTRACT_MODEL_ID", "apac.amazon.nova-lite-v1:0"
-            ),
-            bedrock_api_token=os.environ.get("AWS_BEARER_TOKEN_BEDROCK"),
-            telegram_api_url=os.environ.get(
-                "TELEGRAM_API_URL", "https://api.telegram.org"
-            ),
-            telegram_bot_token_secret_arn=os.environ.get(
-                "TELEGRAM_BOT_TOKEN_SECRET_ARN"
-            ),
-            telegram_webhook_secret_arn=os.environ.get("TELEGRAM_WEBHOOK_SECRET_ARN"),
-            docs_bucket=os.environ.get("DOCS_BUCKET"),
-            schedule_group=os.environ.get("SCHEDULE_GROUP", "ctrl-alt-heal-reminders"),
-            reminder_target_arn=os.environ.get("REMINDER_TARGET_ARN"),
-            scheduler_role_arn=os.environ.get("SCHEDULER_ROLE_ARN"),
-            fhir_table_name=os.environ.get("FHIR_TABLE_NAME"),
-            sealion_secret_arn=os.environ.get("SEALION_SECRET_ARN"),
-        )
+logger.info("--- Settings Loaded ---")
+logger.info(f"Bedrock Model ID: {settings.bedrock_model_id}")
+logger.info(f"Bedrock Multimodal Model ID: {settings.bedrock_multimodal_model_id}")
+logger.info(f"Database Table Name: {settings.database_table_name}")
+logger.info(f"Uploads Bucket Name: {settings.uploads_bucket_name}")
+logger.info(f"Telegram Secret Name: {settings.telegram_secret_name}")
+logger.info("----------------------")
