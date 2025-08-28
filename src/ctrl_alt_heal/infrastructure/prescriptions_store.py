@@ -14,6 +14,11 @@ class PrescriptionsStore:
         self._ddb = boto3.resource("dynamodb")
         self._table = self._ddb.Table(self._table_name) if self._table_name else None
 
+    def _ensure_table(self) -> None:
+        """Ensures the table is properly initialized."""
+        if self._table is None:
+            raise RuntimeError("PRESCRIPTIONS_TABLE_NAME not configured")
+
     def save_prescription(
         self,
         user_id: str,
