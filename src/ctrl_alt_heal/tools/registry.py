@@ -17,6 +17,19 @@ from .identity_tool import (
     create_user_with_identity_tool,
     get_or_create_user_tool,
 )
+from .timezone_tool import (
+    detect_user_timezone_tool,
+    suggest_timezone_from_language_tool,
+)
+from .medication_schedule_tool import (
+    set_medication_schedule_tool,
+    get_medication_schedule_tool,
+    clear_medication_schedule_tool,
+)
+from .medication_ics_tool import (
+    generate_medication_ics_tool,
+    generate_single_medication_ics_tool,
+)
 
 # A simple registry for tools that need to be manually invoked
 tool_registry: dict[str, Callable[..., Any]] = {
@@ -31,4 +44,11 @@ tool_registry: dict[str, Callable[..., Any]] = {
     "find_user_by_identity": find_user_by_identity_tool,
     "create_user_with_identity": create_user_with_identity_tool,
     "get_or_create_user": get_or_create_user_tool,
+    "detect_user_timezone": detect_user_timezone_tool,
+    "suggest_timezone_from_language": suggest_timezone_from_language_tool,
+    "set_medication_schedule": set_medication_schedule_tool,
+    "get_medication_schedule": get_medication_schedule_tool,
+    "clear_medication_schedule": clear_medication_schedule_tool,
+    "generate_medication_ics": generate_medication_ics_tool,
+    "generate_single_medication_ics": generate_single_medication_ics_tool,
 }

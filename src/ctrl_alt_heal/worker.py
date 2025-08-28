@@ -189,6 +189,7 @@ def handler(event: dict[str, Any], _context: Any) -> None:
         body = json.loads(record["body"])
         message = body.get("message", {})
         chat = message.get("chat", {})
+        from_user = message.get("from", {})  # Extract user info from 'from' field
         chat_id = str(chat.get("id"))
 
         # --- Find or create user ---
@@ -201,17 +202,22 @@ def handler(event: dict[str, Any], _context: Any) -> None:
 
         if user:
             now = datetime.now(UTC).isoformat()
-            user.first_name = chat.get("first_name")
-            user.last_name = chat.get("last_name")
-            user.username = chat.get("username")
+            # Update user info from both chat and from fields (prefer from field for user details)
+            user.first_name = from_user.get("first_name") or chat.get("first_name")
+            user.last_name = from_user.get("last_name") or chat.get("last_name")
+            user.username = from_user.get("username") or chat.get("username")
+            # Extract language if available and not already set
+            if not user.language and from_user.get("language_code"):
+                user.language = from_user.get("language_code")
             user.updated_at = now
             users_store.upsert_user(user)
         else:
             now = datetime.now(UTC).isoformat()
             user = User(
-                first_name=chat.get("first_name"),
-                last_name=chat.get("last_name"),
-                username=chat.get("username"),
+                first_name=from_user.get("first_name") or chat.get("first_name"),
+                last_name=from_user.get("last_name") or chat.get("last_name"),
+                username=from_user.get("username") or chat.get("username"),
+                language=from_user.get("language_code"),  # Set language from Telegram
                 created_at=now,
                 updated_at=now,
             )

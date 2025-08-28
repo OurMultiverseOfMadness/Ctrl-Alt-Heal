@@ -25,6 +25,19 @@ from ctrl_alt_heal.tools.identity_tool import (
     create_user_with_identity_tool,
     get_or_create_user_tool,
 )
+from ctrl_alt_heal.tools.timezone_tool import (
+    detect_user_timezone_tool,
+    suggest_timezone_from_language_tool,
+)
+from ctrl_alt_heal.tools.medication_schedule_tool import (
+    set_medication_schedule_tool,
+    get_medication_schedule_tool,
+    clear_medication_schedule_tool,
+)
+from ctrl_alt_heal.tools.medication_ics_tool import (
+    generate_medication_ics_tool,
+    generate_single_medication_ics_tool,
+)
 
 # from ctrl_alt_heal.tools.google_auth_tool import (
 #     exchange_code_for_token_tool,
@@ -99,6 +112,13 @@ def get_agent(
             find_user_by_identity_tool,
             create_user_with_identity_tool,
             get_or_create_user_tool,
+            detect_user_timezone_tool,
+            suggest_timezone_from_language_tool,
+            set_medication_schedule_tool,
+            get_medication_schedule_tool,
+            clear_medication_schedule_tool,
+            generate_medication_ics_tool,
+            generate_single_medication_ics_tool,
         ],
     )
     return agent
