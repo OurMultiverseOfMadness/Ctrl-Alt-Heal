@@ -40,25 +40,19 @@ def get_agent(
     user: User, conversation_history: ConversationHistory | None = None
 ) -> Agent:
     """Returns a new agent instance on every invocation."""
-    system_prompt = get_system_prompt()
+    base_system_prompt = get_system_prompt()
+
+    # Enhance system prompt with user context and notes
+    user_context = f"User context: user_id={user.user_id}, first_name='{user.first_name}', last_name='{user.last_name}', username='{user.username}'"
+
+    system_prompt_parts = [base_system_prompt, user_context]
+
+    if user.notes:
+        system_prompt_parts.append(f"Important notes about this user: {user.notes}")
+
+    system_prompt = "\n\n".join(system_prompt_parts)
 
     messages = []
-    # Prime the agent with user identity context
-    messages.append(
-        {
-            "role": "system",
-            "content": f"User context: user_id={user.user_id}, first_name='{user.first_name}', last_name='{user.last_name}', username='{user.username}'",
-        }
-    )
-
-    # Prime the agent with long-term memory notes
-    if user.notes:
-        messages.append(
-            {
-                "role": "system",
-                "content": f"Here are some important notes to remember about this user: {user.notes}",
-            }
-        )
 
     # Add the current conversation history
     if conversation_history:

@@ -36,7 +36,7 @@ class DatabaseStack(Stack):
         s3_deployment.BucketDeployment(
             self,
             "DeploySystemPrompt",
-            sources=[s3_deployment.Source.asset("src/ctrl_alt_heal/agent")],
+            sources=[s3_deployment.Source.asset("../src/ctrl_alt_heal/agent")],
             destination_bucket=self.assets_bucket,
             # We only want to deploy the system_prompt.txt file
             include=["system_prompt.txt"],
