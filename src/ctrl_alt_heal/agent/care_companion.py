@@ -28,6 +28,7 @@ from ctrl_alt_heal.tools.identity_tool import (
 from ctrl_alt_heal.tools.timezone_tool import (
     detect_user_timezone_tool,
     suggest_timezone_from_language_tool,
+    auto_detect_timezone_tool,
 )
 from ctrl_alt_heal.tools.medication_schedule_tool import (
     set_medication_schedule_tool,
@@ -114,6 +115,7 @@ def get_agent(
             get_or_create_user_tool,
             detect_user_timezone_tool,
             suggest_timezone_from_language_tool,
+            auto_detect_timezone_tool,
             set_medication_schedule_tool,
             get_medication_schedule_tool,
             clear_medication_schedule_tool,

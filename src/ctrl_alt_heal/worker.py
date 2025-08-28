@@ -255,6 +255,11 @@ def handle_photo_message(
     agent = get_agent(user, history)
     logger.info("Agent created successfully")
 
+    # Debug: Log available tools
+    logger.info(
+        f"Agent has access to tools: {[tool.name for tool in agent.tools] if hasattr(agent, 'tools') else 'Tools not accessible'}"
+    )
+
     agent_response_obj = agent()
     logger.info(f"Raw agent response: {agent_response_obj}")
 
