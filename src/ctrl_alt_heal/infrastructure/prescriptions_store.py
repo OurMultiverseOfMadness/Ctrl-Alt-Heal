@@ -108,6 +108,20 @@ class PrescriptionsStore:
             ExpressionAttributeValues={":t": times_utc_hhmm, ":u": until_iso},
         )
 
+    def update_prescription_source_bundle(
+        self, user_id: str, sk: str, source_bundle_sk: str
+    ) -> None:
+        """Updates the sourceBundleSK field for a prescription to link it to a FHIR bundle."""
+        self._ensure_table()
+        self._table.update_item(  # type: ignore[union-attr]
+            Key={"pk": f"USER#{user_id}", "sk": sk},
+            UpdateExpression="SET sourceBundleSK = :bundle_sk, updatedAt = :updated_at",
+            ExpressionAttributeValues={
+                ":bundle_sk": source_bundle_sk,
+                ":updated_at": datetime.now(UTC).isoformat(),
+            },
+        )
+
     def set_prescription_schedule_names(
         self, user_id: str, sk: str, schedule_names: list[str]
     ) -> None:
