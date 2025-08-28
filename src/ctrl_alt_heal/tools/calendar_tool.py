@@ -3,6 +3,7 @@ from strands import tool
 
 
 @tool(
+    name="calendar_ics",
     description="Creates an ICS file for calendar appointments.",
     inputSchema={
         "type": "object",

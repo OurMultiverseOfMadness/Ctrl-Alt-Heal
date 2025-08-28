@@ -8,6 +8,7 @@ from ctrl_alt_heal.infrastructure.users_store import UsersStore
 
 
 @tool(
+    name="update_user_profile",
     description=(
         "Updates a user's profile with non-medical information. "
         "This is for saving user preferences like timezone or preferred language. "
@@ -42,6 +43,7 @@ def update_user_profile_tool(
 
 
 @tool(
+    name="get_user_profile",
     description=(
         "Retrieves the user's complete profile, including stored prescriptions, appointments, "
         "and personal details like timezone. This should be your FIRST step for almost any "
@@ -67,6 +69,7 @@ def get_user_profile_tool(user_id: str) -> dict[str, Any]:
 
 
 @tool(
+    name="save_user_notes",
     description=(
         "Saves or updates long-term notes and preferences about a user. "
         "Use this to remember key facts like allergies, primary doctor, or communication style. "

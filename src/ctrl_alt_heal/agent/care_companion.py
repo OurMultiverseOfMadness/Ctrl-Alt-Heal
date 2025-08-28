@@ -8,8 +8,6 @@ from strands import Agent
 from strands.models.bedrock import BedrockModel
 
 from ctrl_alt_heal.domain.models import ConversationHistory
-from ctrl_alt_heal.tools.calendar_tool import calendar_ics_tool
-from ctrl_alt_heal.tools.fhir_data_tool import fhir_data_tool
 
 # from ctrl_alt_heal.tools.google_auth_tool import (
 #     exchange_code_for_token_tool,
@@ -21,16 +19,6 @@ from ctrl_alt_heal.tools.fhir_data_tool import fhir_data_tool
 #     list_google_calendar_events_tool,
 #     update_google_calendar_event_tool,
 # )
-from ctrl_alt_heal.tools.image_description_tool import describe_image_tool
-from ctrl_alt_heal.tools.search_tool import search_tool
-from ctrl_alt_heal.tools.prescription_extraction_tool import (
-    prescription_extraction_tool,
-)
-from ctrl_alt_heal.tools.user_profile_tool import (
-    get_user_profile_tool,
-    save_user_notes_tool,
-    update_user_profile_tool,
-)
 from ctrl_alt_heal.domain.models import User
 
 s3 = boto3.client("s3")
@@ -81,20 +69,8 @@ def get_agent(
         system_prompt=system_prompt,
         messages=messages,
         tools=[
-            describe_image_tool,
-            prescription_extraction_tool,
-            fhir_data_tool,
-            calendar_ics_tool,
-            search_tool,
-            # generate_auth_url_tool,
-            # exchange_code_for_token_tool,
-            # create_google_calendar_event_tool,
-            # list_google_calendar_events_tool,
-            # update_google_calendar_event_tool,
-            # delete_google_calendar_event_tool,
-            update_user_profile_tool,
-            get_user_profile_tool,
-            save_user_notes_tool,
+            # Temporarily disable automatic tool handling to prevent conflicts
+            # Tools will be handled manually via the tool registry
         ],
     )
     return agent

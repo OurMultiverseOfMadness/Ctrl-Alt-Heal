@@ -6,6 +6,7 @@ from ctrl_alt_heal.tools.fhir_store import FhirStore
 
 
 @tool(
+    name="fhir_data",
     description="Stores FHIR data in S3 and DynamoDB.",
     inputSchema={
         "type": "object",

@@ -13,6 +13,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
 
 @tool(
+    name="generate_auth_url",
     description="Generates a Google Calendar authentication URL.",
     inputSchema={
         "type": "object",
@@ -43,6 +44,7 @@ def generate_auth_url_tool(user_id: str) -> str:
 
 
 @tool(
+    name="exchange_code_for_token",
     description="Exchanges an authorization code for a refresh token.",
     inputSchema={
         "type": "object",
