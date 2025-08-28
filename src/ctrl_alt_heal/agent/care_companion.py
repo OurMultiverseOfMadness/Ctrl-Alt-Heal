@@ -43,6 +43,14 @@ def get_agent(
     system_prompt = get_system_prompt()
 
     messages = []
+    # Prime the agent with user identity context
+    messages.append(
+        {
+            "role": "system",
+            "content": f"User context: user_id={user.user_id}, first_name='{user.first_name}', last_name='{user.last_name}', username='{user.username}'",
+        }
+    )
+
     # Prime the agent with long-term memory notes
     if user.notes:
         messages.append(

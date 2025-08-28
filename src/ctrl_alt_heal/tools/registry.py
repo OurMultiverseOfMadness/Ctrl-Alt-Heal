@@ -12,6 +12,11 @@ from .user_profile_tool import (
     get_user_profile_tool,
     save_user_notes_tool,
 )
+from .identity_tool import (
+    find_user_by_identity_tool,
+    create_user_with_identity_tool,
+    get_or_create_user_tool,
+)
 
 # A simple registry for tools that need to be manually invoked
 tool_registry: dict[str, Callable[..., Any]] = {
@@ -23,4 +28,7 @@ tool_registry: dict[str, Callable[..., Any]] = {
     "update_user_profile": update_user_profile_tool,
     "get_user_profile": get_user_profile_tool,
     "save_user_notes": save_user_notes_tool,
+    "find_user_by_identity": find_user_by_identity_tool,
+    "create_user_with_identity": create_user_with_identity_tool,
+    "get_or_create_user": get_or_create_user_tool,
 }
