@@ -123,36 +123,118 @@ class Bedrock(PrescriptionExtractor):
 
             # Manually parse the raw JSON to create Prescription objects
             prescriptions = []
-            if extracted and "medications" in extracted:
-                prescription_list = extracted["medications"]
+
+            # Look for prescription data under various possible keys
+            prescription_list = None
+            possible_keys = [
+                "medications",
+                "prescriptions",
+                "drugs",
+                "medicines",
+                "medication_list",
+                "prescription_list",
+            ]
+
+            if extracted:
+                for key in possible_keys:
+                    if key in extracted and extracted[key]:
+                        prescription_list = extracted[key]
+                        break
+
+            if prescription_list:
                 if isinstance(prescription_list, list):
-                    # Get the set of valid field names from the Prescription model
-                    valid_fields = set(Prescription.model_fields.keys())
                     for p_data in prescription_list:
-                        # Filter the dictionary from the LLM to only include valid fields
-                        filtered_data = {
-                            k: v for k, v in p_data.items() if k in valid_fields
+                        # Create a more flexible mapping to handle AI variations
+                        mapped_data = {}
+                        extra_fields = {}
+
+                        # Map common variations to our expected field names
+                        field_mappings = {
+                            "name": [
+                                "name",
+                                "medication",
+                                "drug",
+                                "medicine",
+                                "medication_name",
+                                "drug_name",
+                            ],
+                            "dosage": [
+                                "dosage",
+                                "dose",
+                                "amount",
+                                "strength",
+                                "dosage_amount",
+                            ],
+                            "frequency": [
+                                "frequency",
+                                "freq",
+                                "times",
+                                "schedule",
+                                "how_often",
+                                "frequency_text",
+                            ],
+                            "duration_days": [
+                                "duration_days",
+                                "duration",
+                                "days",
+                                "period",
+                                "length",
+                            ],
+                            "totalAmount": [
+                                "totalAmount",
+                                "total_amount",
+                                "total",
+                                "quantity",
+                                "qty",
+                                "amount_dispensed",
+                            ],
+                            "additionalInstructions": [
+                                "additionalInstructions",
+                                "additional_instructions",
+                                "instructions",
+                                "notes",
+                                "directions",
+                                "special_instructions",
+                            ],
                         }
-                        # Capture any extra fields
-                        extra_fields = {
-                            k: v for k, v in p_data.items() if k not in valid_fields
-                        }
+
+                        # Try to map AI output to our expected fields
+                        for target_field, possible_keys in field_mappings.items():
+                            for key in possible_keys:
+                                if key in p_data and p_data[key]:
+                                    mapped_data[target_field] = str(p_data[key])
+                                    break
+
+                        # Collect any unmapped fields as extra
+                        mapped_keys = set()
+                        for possible_keys in field_mappings.values():
+                            mapped_keys.update(possible_keys)
+
+                        for k, v in p_data.items():
+                            if k not in mapped_keys:
+                                extra_fields[k] = v
+
                         if extra_fields:
-                            filtered_data["extra_fields"] = extra_fields
+                            mapped_data["extra_fields"] = extra_fields
 
                         # Ensure required fields have defaults if missing
-                        if "totalAmount" not in filtered_data:
-                            filtered_data["totalAmount"] = "Not specified"
-                        if "dosage" not in filtered_data or not filtered_data["dosage"]:
-                            filtered_data["dosage"] = "Not specified"
+                        if "name" not in mapped_data or not mapped_data["name"]:
+                            mapped_data["name"] = "Unknown medication"
+                        if "dosage" not in mapped_data or not mapped_data["dosage"]:
+                            mapped_data["dosage"] = "Not specified"
                         if (
-                            "frequency" not in filtered_data
-                            or not filtered_data["frequency"]
+                            "frequency" not in mapped_data
+                            or not mapped_data["frequency"]
                         ):
-                            filtered_data["frequency"] = "Not specified"
+                            mapped_data["frequency"] = "Not specified"
+                        if (
+                            "totalAmount" not in mapped_data
+                            or not mapped_data["totalAmount"]
+                        ):
+                            mapped_data["totalAmount"] = "Not specified"
 
                         # Pydantic will validate the data here
-                        prescriptions.append(Prescription(**filtered_data))
+                        prescriptions.append(Prescription(**mapped_data))
 
             return ExtractionResult(
                 raw_json=extracted, confidence=0.5, prescriptions=prescriptions
