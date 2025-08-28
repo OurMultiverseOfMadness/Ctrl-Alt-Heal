@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import boto3
+from functools import lru_cache
 
 from strands import Agent
 from strands.models.bedrock import BedrockModel
@@ -31,17 +33,26 @@ from ctrl_alt_heal.tools.user_profile_tool import (
 )
 from ctrl_alt_heal.domain.models import User
 
+s3 = boto3.client("s3")
+
+
+@lru_cache(maxsize=1)
+def get_system_prompt() -> str:
+    """
+    Fetches the system prompt from S3.
+    The result is cached in memory for the lifetime of the Lambda container.
+    """
+    bucket = os.environ["ASSETS_BUCKET_NAME"]
+    key = "system_prompt.txt"
+    response = s3.get_object(Bucket=bucket, Key=key)
+    return response["Body"].read().decode("utf-8")
+
 
 def get_agent(
     user: User, conversation_history: ConversationHistory | None = None
 ) -> Agent:
     """Returns a new agent instance on every invocation."""
-    # Get the directory of the current file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Construct the full path to the system_prompt.txt file
-    prompt_path = os.path.join(current_dir, "system_prompt.txt")
-    with open(prompt_path) as f:
-        system_prompt = f.read()
+    system_prompt = get_system_prompt()
 
     messages = []
     # Prime the agent with long-term memory notes

@@ -52,6 +52,7 @@ class LambdaStack(Stack):
 
         # Grant S3 bucket access to the worker role
         database_stack.uploads_bucket.grant_read_write(worker_role)
+        database_stack.assets_bucket.grant_read(worker_role)
 
         worker_role.add_to_policy(
             iam.PolicyStatement(
@@ -97,6 +98,7 @@ class LambdaStack(Stack):
                 "PRESCRIPTIONS_TABLE_NAME": database_stack.prescriptions_table.table_name,
                 "FHIR_TABLE_NAME": database_stack.fhir_table.table_name,
                 "UPLOADS_BUCKET_NAME": database_stack.uploads_bucket.bucket_name,
+                "ASSETS_BUCKET_NAME": database_stack.assets_bucket.bucket_name,
                 "SERPER_SECRET_NAME": "CtrlAltHealSerperSecret",
                 "TELEGRAM_SECRET_NAME": "ctrl-alt-heal/telegram/bot-token",
                 "AGENT_VERSION": "3.0",  # Force a redeployment

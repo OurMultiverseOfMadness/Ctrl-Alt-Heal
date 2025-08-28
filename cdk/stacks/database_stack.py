@@ -2,6 +2,7 @@ import aws_cdk as cdk
 from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_s3 as s3,
+    aws_s3_deployment as s3_deployment,
     Stack,
 )
 from constructs import Construct
@@ -20,6 +21,25 @@ class DatabaseStack(Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             encryption=s3.BucketEncryption.S3_MANAGED,
             enforce_ssl=True,
+        )
+
+        self.assets_bucket = s3.Bucket(
+            self,
+            "CtrlAltHealAssetsBucket",
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+            enforce_ssl=True,
+            versioned=True,  # Enable versioning for the system prompt
+        )
+
+        # Deploy the system prompt to the assets bucket
+        s3_deployment.BucketDeployment(
+            self,
+            "DeploySystemPrompt",
+            sources=[s3_deployment.Source.asset("src/ctrl_alt_heal/agent")],
+            destination_bucket=self.assets_bucket,
+            # We only want to deploy the system_prompt.txt file
+            include=["system_prompt.txt"],
         )
 
         # DynamoDB Table for Users
