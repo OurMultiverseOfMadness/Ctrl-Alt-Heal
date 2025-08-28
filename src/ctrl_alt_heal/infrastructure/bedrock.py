@@ -123,8 +123,8 @@ class Bedrock(PrescriptionExtractor):
 
             # Manually parse the raw JSON to create Prescription objects
             prescriptions = []
-            if extracted and "prescriptions" in extracted:
-                prescription_list = extracted["prescriptions"]
+            if extracted and "medications" in extracted:
+                prescription_list = extracted["medications"]
                 if isinstance(prescription_list, list):
                     # Get the set of valid field names from the Prescription model
                     valid_fields = set(Prescription.model_fields.keys())
@@ -139,6 +139,18 @@ class Bedrock(PrescriptionExtractor):
                         }
                         if extra_fields:
                             filtered_data["extra_fields"] = extra_fields
+
+                        # Ensure required fields have defaults if missing
+                        if "totalAmount" not in filtered_data:
+                            filtered_data["totalAmount"] = "Not specified"
+                        if "dosage" not in filtered_data or not filtered_data["dosage"]:
+                            filtered_data["dosage"] = "Not specified"
+                        if (
+                            "frequency" not in filtered_data
+                            or not filtered_data["frequency"]
+                        ):
+                            filtered_data["frequency"] = "Not specified"
+
                         # Pydantic will validate the data here
                         prescriptions.append(Prescription(**filtered_data))
 
