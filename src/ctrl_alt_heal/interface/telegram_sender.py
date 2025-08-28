@@ -76,3 +76,35 @@ def get_telegram_file_path(file_id: str) -> str | None:
             "An unexpected error occurred while getting file path: %s", e, exc_info=True
         )
         return None
+
+
+def send_telegram_file(
+    chat_id: str, file_content: str, filename: str, caption: str = ""
+):
+    """Sends a file to a Telegram chat."""
+    logger.info("Attempting to send file to chat_id: %s", chat_id)
+    try:
+        secret_name = settings.telegram_secret_name
+        secret_value = get_secret(secret_name)
+        token = secret_value.get("bot_token") or secret_value.get("value")
+
+        if not token:
+            logger.error("Error: Telegram bot token not found in secret.")
+            return
+
+        url = f"https://api.telegram.org/bot{token}/sendDocument"
+
+        # Prepare the file data
+        files = {"document": (filename, file_content, "text/calendar")}
+
+        data = {"chat_id": chat_id, "caption": caption}
+
+        logger.info("Making POST request to Telegram API to send file.")
+        response = requests.post(url, files=files, data=data, timeout=30)
+        response.raise_for_status()
+        logger.info("Successfully sent file to Telegram API.")
+
+    except Exception as e:
+        logger.error(
+            "An unexpected error occurred while sending file: %s", e, exc_info=True
+        )

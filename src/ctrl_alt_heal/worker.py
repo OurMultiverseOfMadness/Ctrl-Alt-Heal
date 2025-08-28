@@ -11,6 +11,7 @@ from ctrl_alt_heal.infrastructure.secrets import get_secret
 from ctrl_alt_heal.interface.telegram_sender import (
     get_telegram_file_path,
     send_telegram_message,
+    send_telegram_file,
 )
 from ctrl_alt_heal.infrastructure.users_store import UsersStore
 from ctrl_alt_heal.tools.registry import tool_registry
@@ -96,6 +97,36 @@ def process_agent_response(
                             # Format error response
                             content = f"ERROR: {result.get('message', 'Failed to extract prescription')}"
                             logger.info(f"Formatted error content: {content}")
+                            tool_results.append(
+                                {"tool_result_id": tool_call_id, "content": content}
+                            )
+                    # Handle ICS file generation
+                    elif tool_name in [
+                        "generate_medication_ics",
+                        "generate_single_medication_ics",
+                    ] and isinstance(result, dict):
+                        if result.get("status") == "success" and result.get(
+                            "ics_content"
+                        ):
+                            # Send the ICS file to the user
+                            ics_content = result["ics_content"]
+                            filename = f"medication_reminders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics"
+                            caption = result.get(
+                                "message",
+                                "Here's your medication reminder calendar file!",
+                            )
+
+                            logger.info(f"Sending ICS file to user: {filename}")
+                            send_telegram_file(chat_id, ics_content, filename, caption)
+
+                            # Format success response for the agent
+                            content = f"SUCCESS: {result.get('message', 'ICS file generated successfully')}. File sent to user."
+                            tool_results.append(
+                                {"tool_result_id": tool_call_id, "content": content}
+                            )
+                        else:
+                            # Format error response
+                            content = f"ERROR: {result.get('message', 'Failed to generate ICS file')}"
                             tool_results.append(
                                 {"tool_result_id": tool_call_id, "content": content}
                             )
