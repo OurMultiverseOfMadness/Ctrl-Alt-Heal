@@ -116,6 +116,105 @@ def _normalize_timezone_input(timezone_input: str) -> str | None:
 
 
 @tool(
+    name="auto_detect_timezone",
+    description=(
+        "Automatically detects and suggests timezone based on user's language and proactively asks for confirmation. "
+        "Use this when a new user starts the conversation and you want to set up their timezone proactively."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+        },
+        "required": ["user_id"],
+    },
+)
+def auto_detect_timezone_tool(user_id: str) -> dict[str, Any]:
+    """
+    Automatically detects and suggests timezone based on user's language.
+    This is a proactive tool for new users.
+    """
+    users_store = UsersStore()
+    user = users_store.get_user(user_id)
+    if not user:
+        return {"status": "error", "message": "User not found."}
+
+    # If user already has timezone set, return it
+    if user.timezone:
+        return {
+            "status": "success",
+            "message": f"Your timezone is already set to: {user.timezone}",
+            "timezone": user.timezone,
+            "needs_timezone": False,
+        }
+
+    # If no language info, ask for timezone
+    if not user.language:
+        return {
+            "status": "info",
+            "message": "I'd like to set up your timezone for medication reminders. "
+            "Could you tell me your timezone? You can say something like 'EST', 'Pacific Time', 'UTC+5', or your city name.",
+            "needs_timezone": True,
+        }
+
+    # Use language to suggest timezone
+    language_timezone_map = {
+        "en": [
+            "America/New_York",
+            "America/Los_Angeles",
+            "Europe/London",
+            "Australia/Sydney",
+        ],
+        "es": [
+            "America/Mexico_City",
+            "Europe/Madrid",
+            "America/Argentina/Buenos_Aires",
+        ],
+        "fr": ["Europe/Paris", "America/Montreal"],
+        "de": ["Europe/Berlin", "Europe/Vienna", "Europe/Zurich"],
+        "it": ["Europe/Rome"],
+        "pt": ["America/Sao_Paulo", "Europe/Lisbon"],
+        "ru": ["Europe/Moscow", "Asia/Yekaterinburg"],
+        "zh": ["Asia/Shanghai", "Asia/Hong_Kong", "Asia/Taipei"],
+        "ja": ["Asia/Tokyo"],
+        "ko": ["Asia/Seoul"],
+        "hi": ["Asia/Kolkata"],
+        "ar": ["Asia/Riyadh", "Africa/Cairo"],
+        "tr": ["Europe/Istanbul"],
+        "nl": ["Europe/Amsterdam"],
+        "sv": ["Europe/Stockholm"],
+        "no": ["Europe/Oslo"],
+        "da": ["Europe/Copenhagen"],
+        "fi": ["Europe/Helsinki"],
+        "pl": ["Europe/Warsaw"],
+    }
+
+    suggestions = language_timezone_map.get(user.language, [])
+
+    if suggestions:
+        # Auto-set the first suggestion as default
+        default_timezone = suggestions[0]
+        user.timezone = default_timezone
+        users_store.upsert_user(user)
+
+        return {
+            "status": "success",
+            "message": f"Based on your language ({user.language}), I've set your timezone to {default_timezone}. "
+            f"If this is incorrect, you can tell me your actual timezone anytime.",
+            "timezone": default_timezone,
+            "needs_timezone": False,
+            "auto_detected": True,
+        }
+    else:
+        return {
+            "status": "info",
+            "message": "I'd like to set up your timezone for medication reminders. "
+            "Could you tell me your timezone? You can say something like 'EST', 'Pacific Time', 'UTC+5', or your city name.",
+            "needs_timezone": True,
+        }
+
+
+@tool(
     name="detect_user_timezone",
     description=(
         "Detects and sets the user's timezone. Use this when a user mentions their timezone, "
