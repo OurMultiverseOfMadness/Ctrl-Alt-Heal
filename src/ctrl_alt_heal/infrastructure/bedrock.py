@@ -43,17 +43,28 @@ class Bedrock(PrescriptionExtractor):
         img_bytes = obj["Body"].read()
 
         prompt_text = (
-            "Extract medications as JSON: "
-            "medications:[{name,dosage,frequency,route,duration_days}], "
-            "patient_name, doctor_name."
+            "Extract medications from this prescription image as JSON. "
+            "For each medication, extract: name, dosage (amount per dose), "
+            "frequency (how often to take), duration_days (total days of treatment), "
+            "totalAmount (total quantity dispensed), and additionalInstructions (special notes)."
         )
         system_prompt = (
-            "You are a clinical pharmacist. "
-            "Reply ONLY valid JSON. "
-            "Schema: {medications:[{name:string,dosage:string,"
-            "frequency:string,route?:string,"
-            "duration_days?:number}],"
-            "patient_name?:string,doctor_name?:string}."
+            "You are a clinical pharmacist extracting prescription data. "
+            "Reply ONLY valid JSON with NO additional text. "
+            "Schema: {"
+            '"medications":['
+            "{"
+            '"name":"string (medication name)",'
+            "\"dosage\":\"string (e.g. '1 tablet', '500mg', '2 capsules')\","
+            "\"frequency\":\"string (e.g. 'twice daily', 'every 8 hours', 'as needed')\","
+            '"duration_days":number (total treatment days, or null if not specified),'
+            "\"totalAmount\":\"string (e.g. '30 tablets', '100ml bottle', 'sufficient quantity')\","
+            "\"additionalInstructions\":\"string (e.g. 'take with food', 'avoid alcohol') or null\""
+            "}"
+            "],"
+            '"patient_name":"string or null",'
+            '"doctor_name":"string or null"'
+            "}"
         )
         request_body = {
             "messages": [
