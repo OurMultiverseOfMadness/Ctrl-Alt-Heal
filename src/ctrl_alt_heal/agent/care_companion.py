@@ -96,6 +96,33 @@ def get_agent(
         f"System prompt contains set_medication_schedule: {'set_medication_schedule' in system_prompt}"
     )
 
+    # Debug: Log tools being passed to agent
+    tools_list = [
+        describe_image_tool,
+        prescription_extraction_tool,
+        fhir_data_tool,
+        calendar_ics_tool,
+        search_tool,
+        update_user_profile_tool,
+        get_user_profile_tool,
+        save_user_notes_tool,
+        find_user_by_identity_tool,
+        create_user_with_identity_tool,
+        get_or_create_user_tool,
+        detect_user_timezone_tool,
+        suggest_timezone_from_language_tool,
+        auto_detect_timezone_tool,
+        set_medication_schedule_tool,
+        get_medication_schedule_tool,
+        clear_medication_schedule_tool,
+        get_user_prescriptions_tool,
+        show_all_medications_tool,
+        generate_medication_ics_tool,
+        generate_single_medication_ics_tool,
+    ]
+    logger.info(f"Number of tools being passed to agent: {len(tools_list)}")
+    logger.info(f"Tool names being passed: {[tool.name for tool in tools_list]}")
+
     messages = []
 
     # Add the current conversation history

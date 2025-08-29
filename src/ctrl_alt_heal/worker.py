@@ -274,9 +274,16 @@ def handle_text_message(
     agent = get_agent(user, history)
 
     # Debug: Log available tools for text messages
-    logger.info(
-        f"Agent has access to tools: {[tool.name for tool in agent.tools] if hasattr(agent, 'tools') else 'Tools not accessible'}"
-    )
+    logger.info(f"Agent object type: {type(agent)}")
+    logger.info(f"Agent has tools attribute: {hasattr(agent, 'tools')}")
+    if hasattr(agent, "tools"):
+        logger.info(f"Agent tools: {[tool.name for tool in agent.tools]}")
+    else:
+        logger.info("Agent does not have tools attribute")
+        # Try to find tools in other attributes
+        for attr in dir(agent):
+            if "tool" in attr.lower():
+                logger.info(f"Found tool-related attribute: {attr}")
 
     response_obj = agent()
 
