@@ -379,6 +379,13 @@ def get_user_prescriptions_tool(user_id: str) -> dict[str, Any]:
             "status": prescription.get("status", ""),
         }
 
+        # Debug logging to see what data we're getting
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"Prescription data: {prescription}")
+        logger.info(f"Extracted info: {prescription_info}")
+
         if schedule_times and schedule_until:
             # This prescription has a schedule
             if user.timezone:
