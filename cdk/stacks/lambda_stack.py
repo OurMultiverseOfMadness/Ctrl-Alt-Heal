@@ -105,9 +105,9 @@ class LambdaStack(Stack):
                 "FHIR_TABLE_NAME": database_stack.fhir_table.table_name,
                 "UPLOADS_BUCKET_NAME": database_stack.uploads_bucket.bucket_name,
                 "ASSETS_BUCKET_NAME": database_stack.assets_bucket.bucket_name,
-                "SERPER_SECRET_NAME": "CtrlAltHealSerperSecret",
+                "SERPER_SECRET_NAME": "ctrl-alt-heal/serper/api-key",
                 "TELEGRAM_SECRET_NAME": "ctrl-alt-heal/telegram/bot-token",
-                "AGENT_VERSION": "3.0",  # Force a redeployment
+                "AGENT_VERSION": "3.2",  # Force a redeployment
             },
             timeout=cdk.Duration.seconds(240),
         )

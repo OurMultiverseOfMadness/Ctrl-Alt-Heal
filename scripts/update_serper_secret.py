@@ -17,7 +17,7 @@ def update_serper_secret(api_key: str, region: str = "ap-southeast-1"):
     session = boto3.session.Session()
     client = session.client(service_name="secretsmanager", region_name=region)
 
-    secret_name = "CtrlAltHealSerperSecret"
+    secret_name = "ctrl-alt-heal/serper/api-key"
     secret_value = json.dumps({"api_key": api_key})
 
     try:

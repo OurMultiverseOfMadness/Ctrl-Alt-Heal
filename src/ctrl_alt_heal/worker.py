@@ -27,6 +27,7 @@ from ctrl_alt_heal.config import settings
 # Set up logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+# Force Lambda redeployment to fix secret permissions
 
 s3_client = boto3.client("s3")
 

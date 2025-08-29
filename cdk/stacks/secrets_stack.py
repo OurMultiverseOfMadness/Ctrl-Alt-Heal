@@ -11,8 +11,8 @@ class SecretsStack(Stack):
         # Create Serper API Secret
         self.serper_secret = secretsmanager.Secret(
             self,
-            "CtrlAltHealSerperSecret",
-            secret_name="CtrlAltHealSerperSecret",
+            "CtrlAltHealSerperSecretV2",
+            secret_name="ctrl-alt-heal/serper/api-key",
             description="Serper API key for web search functionality",
             generate_secret_string=secretsmanager.SecretStringGenerator(
                 secret_string_template='{"api_key": "PLACEHOLDER"}',
@@ -21,17 +21,11 @@ class SecretsStack(Stack):
             ),
         )
 
-        # Create Telegram Bot Token Secret
-        self.telegram_secret = secretsmanager.Secret(
+        # Import existing Telegram Bot Token Secret
+        self.telegram_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
             "CtrlAltHealTelegramSecret",
-            secret_name="ctrl-alt-heal/telegram/bot-token",
-            description="Telegram bot token for messaging functionality",
-            generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"value": "PLACEHOLDER"}',
-                generate_string_key="value",
-                exclude_characters="\"'\\",
-            ),
+            secret_complete_arn="arn:aws:secretsmanager:ap-southeast-1:532003627730:secret:ctrl-alt-heal/telegram/bot-token-iVVQbW",
         )
 
         # Note: The actual API keys should be updated manually after deployment

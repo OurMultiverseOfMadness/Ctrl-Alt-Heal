@@ -22,7 +22,7 @@ database_stack = DatabaseStack(
 # Create the secrets stack
 secrets_stack = SecretsStack(
     app,
-    "CtrlAltHealSecretsStack",
+    "CtrlAltHealSecretsStackV2",
     env=aws_env,
 )
 

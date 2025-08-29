@@ -34,7 +34,7 @@ If you prefer to set up the secret manually:
 
 1. Go to AWS Secrets Manager console
 2. Create a new secret
-3. Name: `CtrlAltHealSerperSecret`
+3. Name: `ctrl-alt-heal/serper/api-key`
 4. Secret value: `{"api_key": "your_serper_api_key_here"}`
 
 ### 2. Telegram Bot Token
@@ -104,7 +104,7 @@ If you get a "Secret not found" error:
 
 1. Make sure you've deployed the CDK stack: `cdk deploy --all`
 2. Check that the secret exists in AWS Secrets Manager console
-3. Verify the secret name matches: `CtrlAltHealSerperSecret`
+3. Verify the secret name matches: `ctrl-alt-heal/serper/api-key`
 
 ### Permission Denied Error
 
