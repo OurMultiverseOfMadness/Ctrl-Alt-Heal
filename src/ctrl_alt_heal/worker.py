@@ -13,8 +13,9 @@ from ctrl_alt_heal.infrastructure.identities_store import IdentitiesStore
 from ctrl_alt_heal.infrastructure.secrets import get_secret
 from ctrl_alt_heal.interface.telegram_sender import (
     get_telegram_file_path,
-    send_telegram_message,
     send_telegram_file,
+    send_telegram_message_with_retry,
+    validate_telegram_chat_id,
 )
 from ctrl_alt_heal.infrastructure.users_store import UsersStore
 from ctrl_alt_heal.tools.registry import tool_registry
@@ -192,7 +193,7 @@ def process_agent_response(
             final_message = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
             history.history.append(Message(role="assistant", content=final_message))
             HistoryStore().save_history(history)
-            send_telegram_message(chat_id, final_message)
+            send_telegram_message_with_retry(chat_id, final_message, max_retries=2)
             return
 
         next_response = agent(tool_results=tool_results)
@@ -302,7 +303,24 @@ def process_agent_response(
         # Update session timestamp to keep it active
         history = update_session_timestamp(history)
         HistoryStore().save_history(history)
-        send_telegram_message(chat_id, final_message)
+
+        # Use retry logic for sending the final message
+        try:
+            send_telegram_message_with_retry(chat_id, final_message, max_retries=3)
+        except Exception as e:
+            logger.error(f"Failed to send final message to chat {chat_id}: {e}")
+            # Try one more time with plain text as fallback
+            try:
+                from ctrl_alt_heal.interface.telegram_sender import (
+                    send_telegram_message,
+                )
+                from ctrl_alt_heal.utils.telegram_formatter import TelegramParseMode
+
+                send_telegram_message(
+                    chat_id, final_message, parse_mode=TelegramParseMode.PLAIN_TEXT
+                )
+            except Exception as fallback_error:
+                logger.error(f"Fallback message sending also failed: {fallback_error}")
 
 
 def handle_text_message(
@@ -337,9 +355,10 @@ def handle_photo_message(
 
     file_path = get_telegram_file_path(file_id)
     if not file_path:
-        send_telegram_message(
+        send_telegram_message_with_retry(
             chat_id,
             "Sorry, I couldn't download the image from Telegram. Please try again.",
+            max_retries=2,
         )
         return
 
@@ -347,8 +366,10 @@ def handle_photo_message(
     file_url = f"https://api.telegram.org/file/bot{telegram_bot_token}/{file_path}"
     response = requests.get(file_url)
     if response.status_code != 200:
-        send_telegram_message(
-            chat_id, "Sorry, I had trouble downloading the image. Please try again."
+        send_telegram_message_with_retry(
+            chat_id,
+            "Sorry, I had trouble downloading the image. Please try again.",
+            max_retries=2,
         )
         return
     image_bytes = response.content
@@ -396,6 +417,11 @@ def handler(event: dict[str, Any], _context: Any) -> None:
         chat = message.get("chat", {})
         from_user = message.get("from", {})  # Extract user info from 'from' field
         chat_id = str(chat.get("id"))
+
+        # Validate chat ID before processing
+        if not validate_telegram_chat_id(chat_id):
+            logger.error(f"Invalid or inaccessible chat ID: {chat_id}")
+            continue
 
         # --- Find or create user ---
         identities_store = IdentitiesStore()
@@ -469,6 +495,8 @@ def handler(event: dict[str, Any], _context: Any) -> None:
             handle_photo_message(message, chat_id, user, conversation_history)
         else:
             logger.info("Received a message that is not text or a photo. Ignoring.")
-            send_telegram_message(
-                chat_id, "I can only process text messages and photos at the moment."
+            send_telegram_message_with_retry(
+                chat_id,
+                "I can only process text messages and photos at the moment.",
+                max_retries=2,
             )

@@ -65,7 +65,9 @@ class TestProcessAgentResponse:
         history = ConversationHistory(user_id="test-user")
         chat_id = "12345"
 
-        with patch("ctrl_alt_heal.worker.send_telegram_message") as mock_send, patch(
+        with patch(
+            "ctrl_alt_heal.worker.send_telegram_message_with_retry"
+        ) as mock_send, patch(
             "ctrl_alt_heal.infrastructure.history_store.boto3"
         ) as mock_boto3:
             mock_boto3.resource.return_value = Mock()
@@ -73,7 +75,9 @@ class TestProcessAgentResponse:
             process_agent_response(agent_response, agent, user, history, chat_id)
 
             # Assert
-            mock_send.assert_called_once_with(chat_id, "This is the final response")
+            mock_send.assert_called_once_with(
+                chat_id, "This is the final response", max_retries=3
+            )
             assert len(history.history) == 1
             assert history.history[0].role == "assistant"
             assert history.history[0].content == "This is the final response"
@@ -91,7 +95,9 @@ class TestProcessAgentResponse:
         history = ConversationHistory(user_id="test-user")
         chat_id = "12345"
 
-        with patch("ctrl_alt_heal.worker.send_telegram_message") as mock_send, patch(
+        with patch(
+            "ctrl_alt_heal.worker.send_telegram_message_with_retry"
+        ) as mock_send, patch(
             "ctrl_alt_heal.infrastructure.history_store.boto3"
         ) as mock_boto3:
             mock_boto3.resource.return_value = Mock()
@@ -99,7 +105,9 @@ class TestProcessAgentResponse:
             process_agent_response(agent_response, agent, user, history, chat_id)
 
             # Assert
-            mock_send.assert_called_once_with(chat_id, "Here is the answerFinal answer")
+            mock_send.assert_called_once_with(
+                chat_id, "Here is the answerFinal answer", max_retries=3
+            )
             assert history.history[0].content == "Here is the answerFinal answer"
 
     def test_process_agent_response_empty_after_cleaning(self):
@@ -115,7 +123,9 @@ class TestProcessAgentResponse:
         history = ConversationHistory(user_id="test-user")
         chat_id = "12345"
 
-        with patch("ctrl_alt_heal.worker.send_telegram_message") as mock_send, patch(
+        with patch(
+            "ctrl_alt_heal.worker.send_telegram_message_with_retry"
+        ) as mock_send, patch(
             "ctrl_alt_heal.infrastructure.history_store.boto3"
         ) as mock_boto3:
             mock_boto3.resource.return_value = Mock()
@@ -124,7 +134,7 @@ class TestProcessAgentResponse:
 
             # Assert
             expected_message = "I apologize, but I couldn't generate a proper response. Please try asking your question again."
-            mock_send.assert_called_once_with(chat_id, expected_message)
+            mock_send.assert_called_once_with(chat_id, expected_message, max_retries=3)
 
 
 class TestHandleTextMessage:
@@ -229,7 +239,7 @@ class TestHandlePhotoMessage:
         ) as mock_get_secret, patch(
             "ctrl_alt_heal.worker.requests.get"
         ) as mock_requests_get, patch(
-            "ctrl_alt_heal.worker.send_telegram_message"
+            "ctrl_alt_heal.worker.send_telegram_message_with_retry"
         ) as mock_send:
             mock_get_path.return_value = "photos/file.jpg"
             mock_get_secret.return_value = {"value": "bot-token"}
@@ -240,7 +250,9 @@ class TestHandlePhotoMessage:
 
             # Assert
             mock_send.assert_called_once_with(
-                chat_id, "Sorry, I had trouble downloading the image. Please try again."
+                chat_id,
+                "Sorry, I had trouble downloading the image. Please try again.",
+                max_retries=2,
             )
 
 
