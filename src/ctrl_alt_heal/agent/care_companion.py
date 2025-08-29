@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import boto3
 from functools import lru_cache
 
@@ -84,6 +85,16 @@ def get_agent(
         system_prompt_parts.append(f"Important notes about this user: {user.notes}")
 
     system_prompt = "\n\n".join(system_prompt_parts)
+
+    # Debug: Log system prompt length and key sections
+    logger = logging.getLogger(__name__)
+    logger.info(f"System prompt length: {len(system_prompt)} characters")
+    logger.info(
+        f"System prompt contains medication rules: {'medication' in system_prompt.lower()}"
+    )
+    logger.info(
+        f"System prompt contains set_medication_schedule: {'set_medication_schedule' in system_prompt}"
+    )
 
     messages = []
 

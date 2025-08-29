@@ -272,6 +272,12 @@ def handle_text_message(
     history.history.append(Message(role="user", content=text))
 
     agent = get_agent(user, history)
+
+    # Debug: Log available tools for text messages
+    logger.info(
+        f"Agent has access to tools: {[tool.name for tool in agent.tools] if hasattr(agent, 'tools') else 'Tools not accessible'}"
+    )
+
     response_obj = agent()
 
     # Process the agent's response
