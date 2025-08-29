@@ -15,6 +15,7 @@ from ctrl_alt_heal.utils.timezone_utils import (
     format_time_for_user,
     now_in_user_timezone,
 )
+from ctrl_alt_heal.tools.medication_ics_tool import generate_single_medication_ics_tool
 
 
 @tool(
@@ -128,24 +129,58 @@ def set_medication_schedule_tool(
         until_iso=until_iso,
     )
 
-    # Format confirmation message
-    tz_name = user.timezone
-    times_display = ", ".join(times)
+    # Automatically generate ICS file for the newly scheduled medication
+    try:
+        ics_result = generate_single_medication_ics_tool(
+            user_id=user_id,
+            medication_name=matching_prescription["name"],
+            times=times,
+            duration_days=duration_days,
+        )
 
-    return {
-        "status": "success",
-        "message": f"Great! I've set up a schedule for {matching_prescription['name']} "
-        f"at {times_display} ({tz_name}) for the next {duration_days} days. "
-        f"You'll get reminders at these times each day.\n\n"
-        f"💡 Tip: Would you like me to create a calendar file that you can import "
-        f"into your phone's calendar app? Just ask me to 'generate calendar reminders' "
-        f"or 'create an ICS file for my medications'.",
-        "prescription_name": matching_prescription["name"],
-        "times_user_tz": times,
-        "timezone": tz_name,
-        "duration_days": duration_days,
-        "suggest_ics": True,
-    }
+        if ics_result.get("status") == "success" and ics_result.get("ics_content"):
+            # Include ICS content in the response for automatic sending
+            return {
+                "status": "success",
+                "message": f"Perfect! I've set up a schedule for {matching_prescription['name']} "
+                f"at {', '.join(times)} ({user.timezone}) for the next {duration_days} days. "
+                f"I've also created a calendar file that you can import into your phone's calendar app!",
+                "prescription_name": matching_prescription["name"],
+                "times_user_tz": times,
+                "timezone": user.timezone,
+                "duration_days": duration_days,
+                "ics_content": ics_result["ics_content"],
+                "ics_filename": f"{matching_prescription['name'].replace(' ', '_')}_reminders.ics",
+                "ics_caption": f"Calendar reminders for {matching_prescription['name']} at {', '.join(times)}",
+            }
+        else:
+            # ICS generation failed, but schedule was still created
+            return {
+                "status": "success",
+                "message": f"Great! I've set up a schedule for {matching_prescription['name']} "
+                f"at {', '.join(times)} ({user.timezone}) for the next {duration_days} days. "
+                f"You'll get reminders at these times each day.\n\n"
+                f"💡 Tip: Would you like me to create a calendar file that you can import "
+                f"into your phone's calendar app? Just ask me to 'generate calendar reminders'.",
+                "prescription_name": matching_prescription["name"],
+                "times_user_tz": times,
+                "timezone": user.timezone,
+                "duration_days": duration_days,
+            }
+    except Exception:
+        # ICS generation failed, but schedule was still created
+        return {
+            "status": "success",
+            "message": f"Great! I've set up a schedule for {matching_prescription['name']} "
+            f"at {', '.join(times)} ({user.timezone}) for the next {duration_days} days. "
+            f"You'll get reminders at these times each day.\n\n"
+            f"💡 Tip: Would you like me to create a calendar file that you can import "
+            f"into your phone's calendar app? Just ask me to 'generate calendar reminders'.",
+            "prescription_name": matching_prescription["name"],
+            "times_user_tz": times,
+            "timezone": user.timezone,
+            "duration_days": duration_days,
+        }
 
 
 @tool(

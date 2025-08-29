@@ -100,6 +100,40 @@ def process_agent_response(
                             tool_results.append(
                                 {"tool_result_id": tool_call_id, "content": content}
                             )
+                    # Handle medication schedule creation with automatic ICS generation
+                    elif tool_name == "set_medication_schedule" and isinstance(
+                        result, dict
+                    ):
+                        if result.get("status") == "success" and result.get(
+                            "ics_content"
+                        ):
+                            # Send the automatically generated ICS file to the user
+                            ics_content = result["ics_content"]
+                            filename = result.get(
+                                "ics_filename",
+                                f"medication_reminders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics",
+                            )
+                            caption = result.get(
+                                "ics_caption",
+                                "Here's your medication reminder calendar file!",
+                            )
+
+                            logger.info(
+                                f"Sending automatically generated ICS file to user: {filename}"
+                            )
+                            send_telegram_file(chat_id, ics_content, filename, caption)
+
+                            # Format success response for the agent
+                            content = f"SUCCESS: {result.get('message', 'Medication schedule created successfully')}. ICS file automatically sent to user."
+                            tool_results.append(
+                                {"tool_result_id": tool_call_id, "content": content}
+                            )
+                        else:
+                            # Schedule created but no ICS file (fallback case)
+                            content = f"SUCCESS: {result.get('message', 'Medication schedule created successfully')}"
+                            tool_results.append(
+                                {"tool_result_id": tool_call_id, "content": content}
+                            )
                     # Handle ICS file generation
                     elif tool_name in [
                         "generate_medication_ics",
