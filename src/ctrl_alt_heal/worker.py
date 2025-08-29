@@ -287,7 +287,20 @@ def handle_text_message(
     logger.info(f"Agent object type: {type(agent)}")
     logger.info(f"Agent has tools attribute: {hasattr(agent, 'tools')}")
     if hasattr(agent, "tools"):
-        logger.info(f"Agent tools: {[tool.name for tool in agent.tools]}")
+        # Debug: Log tool names safely
+        try:
+            tool_names = []
+            for tool in agent.tools:
+                if hasattr(tool, "name"):
+                    tool_names.append(tool.name)
+                elif hasattr(tool, "__name__"):
+                    tool_names.append(tool.__name__)
+                else:
+                    tool_names.append(str(type(tool)))
+            logger.info(f"Agent tools: {tool_names}")
+        except Exception as e:
+            logger.warning(f"Could not extract agent tool names: {e}")
+            logger.info(f"Agent tool types: {[type(tool) for tool in agent.tools]}")
     else:
         logger.info("Agent does not have tools attribute")
         # Try to find tools in other attributes
@@ -355,9 +368,22 @@ def handle_photo_message(
     logger.info("Agent created successfully")
 
     # Debug: Log available tools
-    logger.info(
-        f"Agent has access to tools: {[tool.name for tool in agent.tools] if hasattr(agent, 'tools') else 'Tools not accessible'}"
-    )
+    if hasattr(agent, "tools"):
+        try:
+            tool_names = []
+            for tool in agent.tools:
+                if hasattr(tool, "name"):
+                    tool_names.append(tool.name)
+                elif hasattr(tool, "__name__"):
+                    tool_names.append(tool.__name__)
+                else:
+                    tool_names.append(str(type(tool)))
+            logger.info(f"Agent has access to tools: {tool_names}")
+        except Exception as e:
+            logger.warning(f"Could not extract tool names: {e}")
+            logger.info("Agent has tools but could not extract names")
+    else:
+        logger.info("Agent has access to tools: Tools not accessible")
 
     agent_response_obj = agent()
     logger.info(f"Raw agent response: {agent_response_obj}")

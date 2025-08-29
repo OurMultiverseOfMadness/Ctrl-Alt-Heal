@@ -121,7 +121,20 @@ def get_agent(
         generate_single_medication_ics_tool,
     ]
     logger.info(f"Number of tools being passed to agent: {len(tools_list)}")
-    logger.info(f"Tool names being passed: {[tool.name for tool in tools_list]}")
+    # Debug: Log tool names safely
+    try:
+        tool_names = []
+        for tool in tools_list:
+            if hasattr(tool, "name"):
+                tool_names.append(tool.name)
+            elif hasattr(tool, "__name__"):
+                tool_names.append(tool.__name__)
+            else:
+                tool_names.append(str(type(tool)))
+        logger.info(f"Tool names being passed: {tool_names}")
+    except Exception as e:
+        logger.warning(f"Could not extract tool names: {e}")
+        logger.info(f"Tool types: {[type(tool) for tool in tools_list]}")
 
     messages = []
 
