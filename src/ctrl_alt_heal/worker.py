@@ -63,6 +63,9 @@ def process_agent_response(
 
             # Get the tool function from the registry
             tool_function = tool_registry.get(tool_name)
+            logger.info(
+                f"Tool function found for '{tool_name}': {tool_function is not None}"
+            )
 
             if tool_function:
                 try:
@@ -198,6 +201,18 @@ def process_agent_response(
 
         # Send tool results back to the agent
         logger.info(f"Sending tool results back to agent: {tool_results}")
+
+        # Emergency: Check for infinite loop
+        if len(tool_results) > 10:
+            logger.error(
+                f"EMERGENCY: Too many tool calls detected ({len(tool_results)}). Stopping to prevent infinite loop."
+            )
+            final_message = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
+            history.history.append(Message(role="assistant", content=final_message))
+            HistoryStore().save_history(history)
+            send_telegram_message(chat_id, final_message)
+            return
+
         next_response = agent(tool_results=tool_results)
         logger.info(f"Received next response from agent: {next_response}")
         # Process the next response, which could be another tool call or a final message
