@@ -32,6 +32,7 @@ from ctrl_alt_heal.tools.timezone_tool import (
     auto_detect_timezone_tool,
 )
 from ctrl_alt_heal.tools.medication_schedule_tool import (
+    auto_schedule_medication_tool,
     set_medication_schedule_tool,
     get_medication_schedule_tool,
     clear_medication_schedule_tool,
@@ -42,6 +43,9 @@ from ctrl_alt_heal.tools.medication_ics_tool import (
     generate_medication_ics_tool,
     generate_single_medication_ics_tool,
 )
+from ctrl_alt_heal.interface.telegram_sender import send_telegram_file
+from datetime import datetime
+from strands import tool
 
 # from ctrl_alt_heal.tools.google_auth_tool import (
 #     exchange_code_for_token_tool,
@@ -56,6 +60,332 @@ from ctrl_alt_heal.tools.medication_ics_tool import (
 from ctrl_alt_heal.domain.models import User
 
 s3 = boto3.client("s3")
+
+# Global variable to store chat_id for file sending
+_current_chat_id = None
+
+
+def set_chat_id_for_file_sending(chat_id: str):
+    """Set the chat ID for automatic file sending in tool wrappers."""
+    global _current_chat_id
+    _current_chat_id = chat_id
+
+
+@tool(
+    name="generate_medication_ics",
+    description=(
+        "Generates an ICS calendar file for medication reminders that users can import "
+        "into any calendar app. Creates recurring events for each medication schedule. "
+        "Example triggers: 'Create a calendar file for my medications', "
+        "'Generate calendar reminders for my pills', 'Export my medication schedule to calendar'"
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+            "prescription_name": {
+                "type": "string",
+                "description": "Optional: specific medication to create calendar for",
+            },
+            "reminder_minutes": {
+                "type": "integer",
+                "description": "Minutes before medication time to show reminder (default: 15)",
+            },
+            "include_notes": {
+                "type": "boolean",
+                "description": "Include dosage and instructions in calendar event (default: true)",
+            },
+        },
+        "required": ["user_id"],
+    },
+)
+def wrapped_generate_medication_ics_tool(
+    user_id: str,
+    prescription_name: str | None = None,
+    reminder_minutes: int = 15,
+    include_notes: bool = True,
+):
+    """Wrapper that automatically sends ICS files via Telegram."""
+    global _current_chat_id
+    logger = logging.getLogger(__name__)
+
+    # Call the original tool
+    result = generate_medication_ics_tool(
+        user_id=user_id,
+        prescription_name=prescription_name,
+        reminder_minutes=reminder_minutes,
+        include_notes=include_notes,
+    )
+
+    # If successful and we have ICS content, send it via Telegram
+    if (
+        result.get("status") == "success"
+        and result.get("ics_content")
+        and _current_chat_id
+    ):
+        try:
+            ics_content = result["ics_content"]
+            filename = (
+                f"medication_reminders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics"
+            )
+            caption = result.get(
+                "message", "Here's your medication reminder calendar file!"
+            )
+
+            logger.info(f"Auto-sending ICS file to chat {_current_chat_id}: {filename}")
+            send_telegram_file(_current_chat_id, ics_content, filename, caption)
+            logger.info("Successfully auto-sent ICS file")
+
+            # Update the result message to indicate file was sent
+            result["message"] = (
+                result["message"] + " The calendar file has been sent to you!"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to auto-send ICS file: {e}")
+
+    return result
+
+
+@tool(
+    name="generate_single_medication_ics",
+    description=(
+        "Generates an ICS calendar file for a single medication with custom times. "
+        "Use this when creating calendar events for a specific medication. "
+        "Example triggers: 'Create a calendar for this medication', "
+        "'Generate reminders for my morning pills'"
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+            "medication_name": {
+                "type": "string",
+                "description": "Name of the medication to create calendar for",
+            },
+            "times": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of times in user's timezone. Accepts natural formats like ['10am', '2pm', '8pm'] or HH:MM format like ['10:00', '14:00', '20:00']",
+            },
+            "duration_days": {
+                "type": "integer",
+                "description": "Number of days to create events for (default: 30)",
+            },
+            "dosage": {
+                "type": "string",
+                "description": "Dosage information to include in calendar events",
+            },
+            "reminder_minutes": {
+                "type": "integer",
+                "description": "Minutes before medication time to show reminder (default: 15)",
+            },
+        },
+        "required": ["user_id", "medication_name", "times"],
+    },
+)
+def wrapped_generate_single_medication_ics_tool(
+    user_id: str,
+    medication_name: str,
+    times: list[str],
+    duration_days: int = 30,
+    dosage: str | None = None,
+    reminder_minutes: int = 15,
+):
+    """Wrapper that automatically sends single medication ICS files via Telegram."""
+    global _current_chat_id
+    logger = logging.getLogger(__name__)
+
+    # Call the original tool
+    result = generate_single_medication_ics_tool(
+        user_id=user_id,
+        medication_name=medication_name,
+        times=times,
+        duration_days=duration_days,
+        dosage=dosage,
+        reminder_minutes=reminder_minutes,
+    )
+
+    # If successful and we have ICS content, send it via Telegram
+    if (
+        result.get("status") == "success"
+        and result.get("ics_content")
+        and _current_chat_id
+    ):
+        try:
+            ics_content = result["ics_content"]
+            medication_name = result.get("medication_name", "medication")
+            filename = f"{medication_name.replace(' ', '_')}_reminders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics"
+            caption = result.get(
+                "message", f"Here's your calendar file for {medication_name}!"
+            )
+
+            logger.info(
+                f"Auto-sending single ICS file to chat {_current_chat_id}: {filename}"
+            )
+            send_telegram_file(_current_chat_id, ics_content, filename, caption)
+            logger.info("Successfully auto-sent single ICS file")
+
+            # Update the result message to indicate file was sent
+            result["message"] = (
+                result["message"] + " The calendar file has been sent to you!"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to auto-send single ICS file: {e}")
+
+    return result
+
+
+@tool(
+    name="set_medication_schedule",
+    description=(
+        "Sets a medication schedule with specific times in the user's timezone. "
+        "Use this when a user wants to set reminder times for their medication. "
+        "Example triggers: 'Remind me to take my medicine at 8 AM and 8 PM', "
+        "'Set up a schedule for my medication', 'I want to take this twice daily at 9 and 21'"
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+            "prescription_name": {
+                "type": "string",
+                "description": "Name of the medication to schedule",
+            },
+            "times": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of times in user's timezone. Accepts natural formats like ['10am', '2pm', '8pm'] or HH:MM format like ['10:00', '14:00', '20:00']",
+            },
+            "duration_days": {
+                "type": "integer",
+                "description": "Number of days to set the schedule for (default: 30)",
+            },
+        },
+        "required": ["user_id", "prescription_name", "times"],
+    },
+)
+def wrapped_set_medication_schedule_tool(
+    user_id: str, prescription_name: str, times: list[str], duration_days: int = 30
+):
+    """Wrapper that automatically sends ICS files when medication schedules are created."""
+    global _current_chat_id
+    logger = logging.getLogger(__name__)
+
+    # Call the original tool
+    result = set_medication_schedule_tool(
+        user_id=user_id,
+        prescription_name=prescription_name,
+        times=times,
+        duration_days=duration_days,
+    )
+
+    # If successful and we have ICS content, send it via Telegram
+    if (
+        result.get("status") == "success"
+        and result.get("ics_content")
+        and _current_chat_id
+    ):
+        try:
+            ics_content = result["ics_content"]
+            medication_name = result.get("prescription_name", "medication")
+            filename = result.get(
+                "ics_filename",
+                f"{medication_name.replace(' ', '_')}_schedule_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics",
+            )
+            caption = result.get(
+                "ics_caption", f"Calendar reminders for {medication_name}"
+            )
+
+            logger.info(
+                f"Auto-sending schedule ICS file to chat {_current_chat_id}: {filename}"
+            )
+            send_telegram_file(_current_chat_id, ics_content, filename, caption)
+            logger.info("Successfully auto-sent schedule ICS file")
+
+            # Update the result message to indicate file was sent
+            result["message"] = (
+                result["message"] + " The calendar file has been sent to you!"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to auto-send schedule ICS file: {e}")
+
+    return result
+
+
+@tool(
+    name="auto_schedule_medication",
+    description=(
+        "Automatically creates medication schedules with default times based on prescription frequency. "
+        "Use this when user wants to set up reminders but hasn't specified exact times. "
+        "Example triggers: 'Set up medication reminders', 'Create schedules for my medications', "
+        "'I want reminders for all my pills'"
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+            "prescription_name": {
+                "type": "string",
+                "description": "Name of the medication to schedule",
+            },
+            "duration_days": {
+                "type": "integer",
+                "description": "Number of days to set the schedule for (default: 30)",
+            },
+        },
+        "required": ["user_id", "prescription_name"],
+    },
+)
+def wrapped_auto_schedule_medication_tool(
+    user_id: str, prescription_name: str, duration_days: int = 30
+):
+    """Wrapper that automatically sends ICS files when auto-schedules are created."""
+    global _current_chat_id
+    logger = logging.getLogger(__name__)
+
+    # Call the original tool
+    result = auto_schedule_medication_tool(
+        user_id=user_id,
+        prescription_name=prescription_name,
+        duration_days=duration_days,
+    )
+
+    # If successful and we have ICS content, send it via Telegram
+    if (
+        result.get("status") == "success"
+        and result.get("ics_content")
+        and _current_chat_id
+    ):
+        try:
+            ics_content = result["ics_content"]
+            medication_name = result.get("prescription_name", "medication")
+            filename = result.get(
+                "ics_filename",
+                f"{medication_name.replace(' ', '_')}_auto_schedule_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics",
+            )
+            caption = result.get(
+                "ics_caption",
+                f"Auto-generated calendar reminders for {medication_name}",
+            )
+
+            logger.info(
+                f"Auto-sending auto-schedule ICS file to chat {_current_chat_id}: {filename}"
+            )
+            send_telegram_file(_current_chat_id, ics_content, filename, caption)
+            logger.info("Successfully auto-sent auto-schedule ICS file")
+
+            # Update the result message to indicate file was sent
+            result["message"] = (
+                result["message"] + " The calendar file has been sent to you!"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to auto-send auto-schedule ICS file: {e}")
+
+    return result
 
 
 @lru_cache(maxsize=1)
@@ -112,13 +442,14 @@ def get_agent(
         detect_user_timezone_tool,
         suggest_timezone_from_language_tool,
         auto_detect_timezone_tool,
-        set_medication_schedule_tool,
+        wrapped_auto_schedule_medication_tool,
+        wrapped_set_medication_schedule_tool,
         get_medication_schedule_tool,
         clear_medication_schedule_tool,
         get_user_prescriptions_tool,
         show_all_medications_tool,
-        generate_medication_ics_tool,
-        generate_single_medication_ics_tool,
+        wrapped_generate_medication_ics_tool,
+        wrapped_generate_single_medication_ics_tool,
     ]
     logger.info(f"Number of tools being passed to agent: {len(tools_list)}")
     # Debug: Log tool names safely
@@ -169,13 +500,14 @@ def get_agent(
             detect_user_timezone_tool,
             suggest_timezone_from_language_tool,
             auto_detect_timezone_tool,
-            set_medication_schedule_tool,
+            wrapped_auto_schedule_medication_tool,
+            wrapped_set_medication_schedule_tool,
             get_medication_schedule_tool,
             clear_medication_schedule_tool,
             get_user_prescriptions_tool,
             show_all_medications_tool,
-            generate_medication_ics_tool,
-            generate_single_medication_ics_tool,
+            wrapped_generate_medication_ics_tool,
+            wrapped_generate_single_medication_ics_tool,
         ],
     )
     return agent

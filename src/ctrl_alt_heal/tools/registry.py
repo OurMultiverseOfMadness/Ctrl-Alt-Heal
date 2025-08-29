@@ -23,6 +23,7 @@ from .timezone_tool import (
     auto_detect_timezone_tool,
 )
 from .medication_schedule_tool import (
+    auto_schedule_medication_tool,
     set_medication_schedule_tool,
     get_medication_schedule_tool,
     clear_medication_schedule_tool,
@@ -50,6 +51,7 @@ tool_registry: dict[str, Callable[..., Any]] = {
     "detect_user_timezone": detect_user_timezone_tool,
     "suggest_timezone_from_language": suggest_timezone_from_language_tool,
     "auto_detect_timezone": auto_detect_timezone_tool,
+    "auto_schedule_medication": auto_schedule_medication_tool,
     "set_medication_schedule": set_medication_schedule_tool,
     "get_medication_schedule": get_medication_schedule_tool,
     "clear_medication_schedule": clear_medication_schedule_tool,

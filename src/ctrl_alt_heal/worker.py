@@ -3,7 +3,10 @@ from typing import Any
 
 import boto3
 import requests
-from ctrl_alt_heal.agent.care_companion import get_agent
+from ctrl_alt_heal.agent.care_companion import get_agent, set_chat_id_for_file_sending
+from ctrl_alt_heal.tools.medication_ics_tool import (
+    set_chat_id_for_file_sending as set_ics_chat_id,
+)
 from ctrl_alt_heal.domain.models import ConversationHistory, Identity, Message, User
 from ctrl_alt_heal.infrastructure.history_store import HistoryStore
 from ctrl_alt_heal.infrastructure.identities_store import IdentitiesStore
@@ -43,6 +46,9 @@ def process_agent_response(
     logger.info(
         f"--- Processing agent response. Raw response object: {agent_response_obj} ---"
     )
+    logger.info(f"Agent response type: {type(agent_response_obj)}")
+    if isinstance(agent_response_obj, dict):
+        logger.info(f"Agent response keys: {list(agent_response_obj.keys())}")
     if isinstance(agent_response_obj, dict) and "tool_calls" in agent_response_obj:
         logger.info("Tool call(s) detected in agent response.")
         tool_calls = agent_response_obj["tool_calls"]
@@ -114,9 +120,10 @@ def process_agent_response(
                                 {"tool_result_id": tool_call_id, "content": content}
                             )
                     # Handle medication schedule creation with automatic ICS generation
-                    elif tool_name == "set_medication_schedule" and isinstance(
-                        result, dict
-                    ):
+                    elif tool_name in [
+                        "set_medication_schedule",
+                        "auto_schedule_medication",
+                    ] and isinstance(result, dict):
                         if result.get("status") == "success" and result.get(
                             "ics_content"
                         ):
@@ -247,6 +254,49 @@ def process_agent_response(
                 "This suggests the agent is not following the system prompt instructions to use tools for medication scheduling."
             )
 
+        # Fallback: If agent describes creating calendar files but didn't call tools, call the tool automatically
+        if (
+            any(
+                phrase in response_lower
+                for phrase in [
+                    "i've created a calendar file",
+                    "created a calendar file",
+                    "calendar file with reminders",
+                    "calendar files and import them",
+                ]
+            )
+            and "generate_medication_ics" not in response_lower
+        ):
+            logger.warning(
+                "Agent described creating calendar files but didn't call generate_medication_ics tool. Calling it automatically."
+            )
+
+            try:
+                # Import the tool and call it directly
+                from ctrl_alt_heal.tools.medication_ics_tool import (
+                    generate_medication_ics_tool,
+                )
+
+                result = generate_medication_ics_tool(
+                    user_id=user.user_id,
+                    prescription_name=None,  # Generate for all medications
+                    reminder_minutes=15,
+                    include_notes=True,
+                )
+
+                if result.get("status") == "success":
+                    logger.info(
+                        "Successfully generated ICS file via fallback mechanism"
+                    )
+                    # The tool will automatically send the file via Telegram
+                else:
+                    logger.error(
+                        f"Fallback ICS generation failed: {result.get('message')}"
+                    )
+
+            except Exception as e:
+                logger.error(f"Error in fallback ICS generation: {e}")
+
             # Additional check for specific medication mentions with times
             if any(
                 time_phrase in response_lower
@@ -296,6 +346,10 @@ def handle_text_message(
     text = message.get("text", "")
     history.history.append(Message(role="user", content=text))
 
+    # Set chat ID for automatic file sending in tool wrappers
+    set_chat_id_for_file_sending(chat_id)
+    set_ics_chat_id(chat_id)
+
     agent = get_agent(user, history)
 
     # Debug: Log available tools for text messages
@@ -323,7 +377,12 @@ def handle_text_message(
             if "tool" in attr.lower():
                 logger.info(f"Found tool-related attribute: {attr}")
 
+    # Use agent() to execute tools directly
+    logger.info("Using agent() to execute tools directly")
     response_obj = agent()
+
+    # Debug: Log what the agent returned
+    logger.info(f"Agent returned: {type(response_obj)} - {response_obj}")
 
     # Process the agent's response
     process_agent_response(response_obj, agent, user, history, chat_id)
@@ -378,6 +437,10 @@ def handle_photo_message(
 
     history.history.append(Message(role="user", content=agent_prompt))
 
+    # Set chat ID for automatic file sending in tool wrappers
+    set_chat_id_for_file_sending(chat_id)
+    set_ics_chat_id(chat_id)
+
     # Invoke the agent
     agent = get_agent(user, history)
     logger.info("Agent created successfully")
@@ -400,7 +463,10 @@ def handle_photo_message(
     else:
         logger.info("Agent has access to tools: Tools not accessible")
 
+    # Use agent() to execute tools directly
+    logger.info("Using agent() to execute tools directly")
     agent_response_obj = agent()
+
     logger.info(f"Raw agent response: {agent_response_obj}")
 
     # Process the agent's response

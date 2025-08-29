@@ -18,6 +18,195 @@ from ctrl_alt_heal.utils.timezone_utils import (
 from ctrl_alt_heal.tools.medication_ics_tool import generate_single_medication_ics_tool
 
 
+def _parse_frequency_to_times(frequency_text: str) -> list[str]:
+    """
+    Parse frequency text to default times.
+    Returns a list of times in HH:MM format.
+    """
+    if not frequency_text:
+        return ["08:00"]  # Default to morning
+
+    frequency_lower = frequency_text.lower()
+    times = []
+
+    # Check for specific patterns
+    if "morning" in frequency_lower:
+        times.append("08:00")
+    if "night" in frequency_lower or "evening" in frequency_lower:
+        times.append("20:00")
+    if "afternoon" in frequency_lower or "noon" in frequency_lower:
+        times.append("12:00")
+
+    # Handle "twice daily" or "2 times" patterns
+    if ("twice" in frequency_lower or "2 " in frequency_lower) and len(times) == 0:
+        times = ["08:00", "20:00"]
+    elif (
+        "thrice" in frequency_lower
+        or "three" in frequency_lower
+        or "3 " in frequency_lower
+    ) and len(times) == 0:
+        times = ["08:00", "14:00", "20:00"]
+    elif ("four" in frequency_lower or "4 " in frequency_lower) and len(times) == 0:
+        times = ["08:00", "12:00", "16:00", "20:00"]
+
+    # If no times found, default to morning
+    if not times:
+        times = ["08:00"]
+
+    return times
+
+
+def _parse_natural_time_input(time_input: str) -> str | None:
+    """
+    Parse natural time input to HH:MM format.
+    Handles formats like "10am", "2pm", "8pm", "10:30am", "14:30", etc.
+    """
+    if not time_input:
+        return None
+
+    time_input = time_input.lower().strip()
+
+    # Handle 24-hour format (already in HH:MM)
+    if ":" in time_input and ("am" not in time_input and "pm" not in time_input):
+        try:
+            # Validate it's a proper HH:MM format
+            datetime.strptime(time_input, "%H:%M")
+            return time_input
+        except ValueError:
+            return None
+
+    # Handle 12-hour format with AM/PM
+    import re
+
+    # Pattern for times like "10am", "2pm", "10:30am", "2:30pm"
+    pattern = r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)"
+    match = re.match(pattern, time_input)
+
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2)) if match.group(2) else 0
+        period = match.group(3)
+
+        # Validate hour and minute
+        if hour < 1 or hour > 12 or minute < 0 or minute > 59:
+            return None
+
+        # Convert to 24-hour format
+        if period == "pm" and hour != 12:
+            hour += 12
+        elif period == "am" and hour == 12:
+            hour = 0
+
+        return f"{hour:02d}:{minute:02d}"
+
+    return None
+
+
+def _parse_natural_times_input(times_input: str | list[str]) -> list[str]:
+    """
+    Parse natural time inputs to list of HH:MM format times.
+    Handles both string input (comma-separated) and list input.
+    """
+    if isinstance(times_input, str):
+        # Split by comma and clean up
+        time_strings = [t.strip() for t in times_input.split(",")]
+    else:
+        time_strings = times_input
+
+    parsed_times = []
+    for time_str in time_strings:
+        parsed_time = _parse_natural_time_input(time_str)
+        if parsed_time:
+            parsed_times.append(parsed_time)
+
+    return parsed_times
+
+
+@tool(
+    name="auto_schedule_medication",
+    description=(
+        "Automatically creates medication schedules with default times based on prescription frequency. "
+        "Use this when user wants to set up reminders but hasn't specified exact times. "
+        "Example triggers: 'Set up medication reminders', 'Create schedules for my medications', "
+        "'I want reminders for all my pills'"
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+            "prescription_name": {
+                "type": "string",
+                "description": "Name of the medication to schedule",
+            },
+            "duration_days": {
+                "type": "integer",
+                "description": "Number of days to set the schedule for (default: 30)",
+            },
+        },
+        "required": ["user_id", "prescription_name"],
+    },
+)
+def auto_schedule_medication_tool(
+    user_id: str, prescription_name: str, duration_days: int = 30
+) -> dict[str, Any]:
+    """
+    Automatically creates a medication schedule with default times based on frequency.
+    """
+    users_store = UsersStore()
+    prescriptions_store = PrescriptionsStore()
+
+    # Get user for timezone info
+    user = users_store.get_user(user_id)
+    if not user:
+        return {"status": "error", "message": "User not found."}
+
+    if not user.timezone:
+        return {
+            "status": "error",
+            "message": "I need to know your timezone first. Could you tell me your timezone? "
+            "(e.g., 'EST', 'Pacific Time', 'UTC+5', or a city like 'New York')",
+            "needs_timezone": True,
+        }
+
+    # Find the prescription
+    prescriptions = prescriptions_store.list_prescriptions(user_id, status="active")
+    matching_prescription = None
+
+    for prescription in prescriptions:
+        if prescription_name.lower() in prescription.get("name", "").lower():
+            matching_prescription = prescription
+            break
+
+    if not matching_prescription:
+        # List available prescriptions for the user
+        available_names = [p.get("name", "") for p in prescriptions if p.get("name")]
+        if available_names:
+            return {
+                "status": "error",
+                "message": f"I couldn't find a prescription for '{prescription_name}'. "
+                f"Your active prescriptions are: {', '.join(available_names)}. "
+                "Could you specify which one you'd like to schedule?",
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "I couldn't find any active prescriptions for you. "
+                "Please add a prescription first before setting up a schedule.",
+            }
+
+    # Get frequency text and parse to default times
+    frequency_text = matching_prescription.get("frequencyText", "")
+    default_times = _parse_frequency_to_times(frequency_text)
+
+    # Use the existing set_medication_schedule_tool with default times
+    return set_medication_schedule_tool(
+        user_id=user_id,
+        prescription_name=prescription_name,
+        times=default_times,
+        duration_days=duration_days,
+    )
+
+
 @tool(
     name="set_medication_schedule",
     description=(
@@ -37,7 +226,7 @@ from ctrl_alt_heal.tools.medication_ics_tool import generate_single_medication_i
             "times": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of times in user's timezone (e.g., ['08:00', '20:00', '14:30'])",
+                "description": "List of times in user's timezone. Accepts natural formats like ['10am', '2pm', '8pm'] or HH:MM format like ['10:00', '14:00', '20:00']",
             },
             "duration_days": {
                 "type": "integer",
@@ -95,17 +284,18 @@ def set_medication_schedule_tool(
                 "Please add a prescription first before setting up a schedule.",
             }
 
-    # Validate time format
-    try:
-        # Test parsing each time
-        for time_str in times:
-            datetime.strptime(time_str, "%H:%M")
-    except ValueError:
+    # Parse and validate times (supports natural formats like "10am", "2pm", "8pm")
+    parsed_times = _parse_natural_times_input(times)
+
+    if not parsed_times:
         return {
             "status": "error",
-            "message": "Please provide times in HH:MM format (24-hour), "
-            "for example: ['08:00', '20:00'] for 8 AM and 8 PM.",
+            "message": "Please provide times in a valid format. Examples: "
+            "['10am', '2pm', '8pm'] or ['10:00', '14:00', '20:00'] or '10am, 2pm, 8pm'",
         }
+
+    # Use parsed times
+    times = parsed_times
 
     # Convert times to UTC for storage
     try:

@@ -143,7 +143,7 @@ def send_telegram_message(chat_id: str, text: str):
         for i, message_part in enumerate(messages):
             if len(messages) > 1:
                 logger.info(
-                    f"Sending message part {i+1}/{len(messages)} ({len(message_part)} characters)"
+                    f"Sending message part {i + 1}/{len(messages)} ({len(message_part)} characters)"
                 )
 
             payload = {"chat_id": chat_id, "text": message_part}
@@ -152,7 +152,7 @@ def send_telegram_message(chat_id: str, text: str):
 
             if len(messages) > 1:
                 logger.info(
-                    f"Successfully sent message part {i+1}/{len(messages)} to Telegram API."
+                    f"Successfully sent message part {i + 1}/{len(messages)} to Telegram API."
                 )
             else:
                 logger.info("Successfully sent message to Telegram API.")
