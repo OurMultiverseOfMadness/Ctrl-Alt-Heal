@@ -65,6 +65,14 @@ def get_user_profile_tool(user_id: str) -> dict[str, Any]:
     if not user:
         return {"status": "error", "message": "User not found."}
 
+    # Debug logging to see user profile data
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"User profile data: {user.model_dump()}")
+    logger.info(f"User timezone: {user.timezone}")
+    logger.info(f"User language: {user.language}")
+
     return {"status": "success", "profile": user.model_dump()}
 
 
