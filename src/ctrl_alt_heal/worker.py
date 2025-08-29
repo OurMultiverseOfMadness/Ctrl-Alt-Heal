@@ -164,6 +164,48 @@ def process_agent_response(
         logger.info("No tool calls detected. Processing as final response.")
         final_message = str(agent_response_obj)
 
+        # Debug: Check if agent promised to create reminders but didn't call tools
+        response_lower = final_message.lower()
+        if any(
+            phrase in response_lower
+            for phrase in [
+                "i'll create",
+                "creating",
+                "i'll set up",
+                "setting up",
+                "i'll schedule",
+                "scheduling",
+                "i'll make",
+            ]
+        ) and any(
+            med_phrase in response_lower
+            for med_phrase in ["reminder", "medication", "schedule", "remind"]
+        ):
+            logger.warning(
+                f"Agent promised to create medication reminders but didn't call set_medication_schedule tool. Response: {final_message}"
+            )
+            logger.warning(
+                "This suggests the agent is not following the system prompt instructions to use tools for medication scheduling."
+            )
+
+            # Additional check for specific medication mentions with times
+            if any(
+                time_phrase in response_lower
+                for time_phrase in ["am", "pm", "morning", "evening", "night"]
+            ) and any(
+                med_phrase in response_lower
+                for med_phrase in [
+                    "zoclear",
+                    "abciximab",
+                    "vomilast",
+                    "capsule",
+                    "tablet",
+                ]
+            ):
+                logger.error(
+                    "CRITICAL: Agent mentioned specific medications and times but didn't call set_medication_schedule tool. This is a major workflow failure."
+                )
+
         # Clean up XML-like tags from the response
         if "</thinking>" in final_message:
             final_message = final_message.split("</thinking>")[-1].strip()
@@ -265,6 +307,27 @@ def handle_photo_message(
 
     # Process the agent's response
     process_agent_response(agent_response_obj, agent, user, history, chat_id)
+
+    # Debug: Check if agent made promises about creating reminders but didn't call tools
+    if isinstance(agent_response_obj, str):
+        response_text = agent_response_obj.lower()
+        if (
+            any(
+                phrase in response_text
+                for phrase in [
+                    "i'll create",
+                    "creating",
+                    "i'll set up",
+                    "setting up",
+                    "i'll schedule",
+                    "scheduling",
+                ]
+            )
+            and "tool" not in response_text
+        ):
+            logger.warning(
+                f"Agent promised to create/setup something but didn't call tools. Response: {agent_response_obj}"
+            )
 
 
 def handler(event: dict[str, Any], _context: Any) -> None:
