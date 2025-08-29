@@ -1,20 +1,31 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from ctrl_alt_heal.domain.models import ExtractionInput, ExtractionResult
+from ctrl_alt_heal.tools.prescription_extractor import ExtractionResult
 from ctrl_alt_heal.tools.prescription_extraction_tool import (
     prescription_extraction_tool,
 )
 
 
-@patch("src.ctrl_alt_heal.tools.prescription_extraction_tool.Bedrock")
-def test_prescription_extraction_tool(mock_bedrock_constructor):
+@patch("ctrl_alt_heal.tools.prescription_extraction_tool.extract_prescription")
+def test_prescription_extraction_tool(mock_extract_prescription):
     """Tests the prescription_extraction_tool."""
     # Arrange
-    mock_extractor_instance = MagicMock()
-    mock_extractor_instance.extract.return_value = ExtractionResult(
-        raw_json={"status": "success"}, confidence=0.9
+    # Create a mock prescription
+    from ctrl_alt_heal.domain.models import Prescription
+
+    mock_prescription = Prescription(
+        name="Test Medication",
+        dosage="1 tablet",
+        frequency="twice daily",
+        totalAmount="14 tablets",
+        additionalInstructions="Take with food",
     )
-    mock_bedrock_constructor.return_value = mock_extractor_instance
+
+    mock_extract_prescription.return_value = ExtractionResult(
+        raw_json={"status": "success"},
+        confidence=0.9,
+        prescriptions=[mock_prescription],
+    )
 
     # Act
     result = prescription_extraction_tool(
@@ -24,12 +35,16 @@ def test_prescription_extraction_tool(mock_bedrock_constructor):
     )
 
     # Assert
-    assert result == {"status": "success"}
-    mock_bedrock_constructor.assert_called_once()
-    mock_extractor_instance.extract.assert_called_once_with(
-        ExtractionInput(
-            user_id="test-user",
-            s3_bucket="test-bucket",
-            s3_key="test-key",
-        )
-    )
+    expected_response = {
+        "status": "success",
+        "message": "Successfully extracted 1 prescription(s) from the image and saved them to your profile.",
+        "prescriptions": [mock_prescription.model_dump()],
+        "count": 1,
+        "extraction_summary": {
+            "total_medications": 1,
+            "medication_names": ["Test Medication"],
+            "extraction_confidence": 0.9,
+        },
+    }
+    assert result == expected_response
+    mock_extract_prescription.assert_called_once()

@@ -18,11 +18,17 @@ docker build -t "$DOCKER_IMAGE_NAME" -f Dockerfile.layer .
 CONTAINER_ID=$(docker create "$DOCKER_IMAGE_NAME")
 
 # Copy the built layer from the container to the host
-# Note the path inside the container is now /opt/python
 docker cp "$CONTAINER_ID:/opt/." "$LAYER_DIR/"
 
 # Remove the container
 docker rm "$CONTAINER_ID"
 
+# Clean up Docker image
+docker rmi "$DOCKER_IMAGE_NAME"
+
 echo "Lambda layer built successfully!"
+echo "Layer size:"
 du -sh "$LAYER_DIR"
+echo ""
+echo "Layer contents:"
+ls -la "$LAYER_DIR"

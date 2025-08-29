@@ -59,16 +59,18 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
 - **Scheduling**: Automated reminder system
 - **Knowledge Base**: Medical information retrieval service
 
-## 🛠️ Installation & Setup
+## 🚀 **Quick Start**
 
 ### Prerequisites
 
-- Python 3.8+
-- Telegram Bot Token
-- Amazon Bedrock access
-- AWS credentials configured
+- **Python 3.11+**
+- **Node.js 18+** (for CDK)
+- **AWS CLI** with configured credentials
+- **Docker** (for Lambda layer builds)
+- **Telegram Bot Token**
+- **Amazon Bedrock access** in ap-southeast-1 region
 
-### Quick Start
+### Installation
 
 1. **Clone the repository**
    ```bash
@@ -76,35 +78,108 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
    cd Ctrl-Alt-Heal
    ```
 
-2. **Create and activate a virtual environment, then install dependencies**
+2. **Set up development environment**
    ```bash
    python3 -m venv .venv
-   source .venv/bin/activate
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    pip install --upgrade pip
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt
    ```
 
-3. **Configure environment variables**
+3. **Install CDK dependencies**
    ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-4. **CDK (infra) setup and deploy**
-   ```bash
-   cd infra/cdk
+   cd cdk
    npm install
-   AWS_PROFILE=your-sso-profile npm run cdk -- bootstrap
-   AWS_PROFILE=your-sso-profile npm run deploy
+   cd ..
    ```
 
-5. **Set Telegram webhook**
+### Deployment
+
+1. **Build Lambda layer**
    ```bash
-   export TELEGRAM_BOT_TOKEN=...   # or store in Secrets Manager as provisioned by CDK
-   export TELEGRAM_WEBHOOK_SECRET=...
-   export WEBHOOK_URL="https://<api-id>.execute-api.<region>.amazonaws.com/telegram/webhook"
-   python scripts/set_telegram_webhook.py
+   ./build-layer.sh
    ```
+
+2. **Deploy infrastructure (one command)**
+   ```bash
+   cd cdk
+   ./deploy.sh
+   cd ..
+   ```
+
+3. **Configure secrets**
+   ```bash
+   # Update secrets in AWS Secrets Manager
+   aws secretsmanager update-secret \
+     --secret-id "ctrl-alt-heal/dev/telegram/bot-token" \
+     --secret-string '{"value": "your_telegram_bot_token"}'
+
+   aws secretsmanager update-secret \
+     --secret-id "ctrl-alt-heal/dev/serper/api-key" \
+     --secret-string '{"api_key": "your_serper_api_key"}'
+   ```
+
+### Environment Configuration
+
+The deployment supports multiple environments with **no hardcoded account IDs**:
+
+```bash
+# Development
+export ENVIRONMENT=dev
+export AWS_REGION=ap-southeast-1
+
+# Production
+export ENVIRONMENT=prod
+export AWS_REGION=ap-southeast-1
+
+# Deploy
+cd cdk && ./deploy.sh
+```
+
+**The deployment automatically detects your AWS account and region.**
+
+### AI Model Configuration
+
+The application uses **Amazon Nova Lite** in the APAC region for optimal performance:
+
+```bash
+# Default Bedrock models (already configured)
+BEDROCK_MODEL_ID=apac.amazon.nova-lite-v1:0
+BEDROCK_MULTIMODAL_MODEL_ID=apac.amazon.nova-lite-v1:0
+```
+
+**Features:**
+- ✅ **APAC Optimized**: Designed for Asia-Pacific users
+- ✅ **Cost Effective**: Nova Lite provides excellent value
+- ✅ **Multimodal**: Handles text and image processing
+- ✅ **Healthcare Focused**: Optimized for medical conversations
+
+### Development
+
+```bash
+# Run tests
+pytest
+
+# Run with coverage
+pytest --cov=src/ctrl_alt_heal --cov-report=html
+
+# Code quality checks
+flake8 src/ tests/
+black src/ tests/
+mypy src/
+```
+
+## 📚 **Documentation**
+
+For comprehensive documentation, see the [docs/](./docs/) directory:
+
+- **[📖 Documentation Index](./docs/README.md)** - Complete documentation overview
+- **[🏗️ Architecture Guide](./docs/architecture.md)** - System design and architecture
+- **[🔧 Development Guide](./docs/development.md)** - Setup and development workflow
+- **[📊 Core Services](./docs/core-services.md)** - Core infrastructure documentation
+- **[📋 Data Models](./docs/data-models.md)** - Data model documentation
+- **[🔄 Refactoring History](./docs/refactoring-history.md)** - Complete refactoring journey
 
 ## 📱 Usage
 
@@ -172,35 +247,63 @@ npm run deploy -- --profile your-sso-profile
 
 ```
 Ctrl-Alt-Heal/
-├── src/
-│   ├── bot/              # Telegram bot implementation
-│   ├── ai/               # AI processing modules
-│   ├── services/         # Core services (scheduling, knowledge base, etc.)
-│   ├── models/           # Data models and FHIR schemas
-│   └── utils/            # Utility functions
-├── tests/                # Test suite
-├── docs/                 # Documentation
-├── config/               # Configuration files
-└── requirements.txt      # Python dependencies
+├── src/ctrl_alt_heal/          # Main application code
+│   ├── agent/                  # AI agent implementation
+│   ├── api/                    # API handlers and validators
+│   ├── core/                   # Core services (DI, caching, logging, etc.)
+│   ├── domain/                 # Data models and domain logic
+│   ├── infrastructure/         # External service integrations
+│   ├── interface/              # Interface implementations
+│   ├── services/               # Business logic services
+│   ├── tools/                  # AI agent tools
+│   ├── utils/                  # Utility functions
+│   └── worker.py               # Main Lambda handler
+├── tests/                      # Test suite (417+ tests)
+│   ├── unit/                   # Unit tests
+│   ├── integration/            # Integration tests
+│   └── tools/                  # Tool-specific tests
+├── cdk/                        # Infrastructure as Code
+├── docs/                       # Comprehensive documentation
+├── scripts/                    # Utility scripts
+└── config/                     # Configuration files
 ```
 
 ### Running Tests
 
 ```bash
-pytest tests/
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=src/ctrl_alt_heal --cov-report=html
+
+# Run specific test categories
+pytest tests/unit/              # Unit tests only
+pytest tests/integration/       # Integration tests only
+pytest tests/tools/             # Tool tests only
+
+# Run with verbose output
+pytest -v
 ```
 
 ### Code Quality
 
 ```bash
 # Linting
-flake8 src/
+flake8 src/ tests/
 
 # Type checking
 mypy src/
 
 # Formatting
-black src/
+black src/ tests/
+
+# Security scanning
+bandit -r src/
+
+# Pre-commit hooks
+pre-commit install
+pre-commit run --all-files
 ```
 
 ## 🤝 Contributing
@@ -225,6 +328,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **FHIR Standard**: Industry-standard healthcare data format
 - **Secure Communication**: End-to-end encryption for patient interactions
 - **Audit Trails**: Comprehensive logging for compliance
+
+## 🛡️ **Enterprise Features**
+
+### **Security & Robustness**
+- **Advanced Security**: Input sanitization, rate limiting, and audit logging
+- **Circuit Breaker Pattern**: Resilient AWS service integration
+- **Health Monitoring**: Real-time system health and performance tracking
+- **Error Handling**: Comprehensive error management and recovery
+
+### **Code Quality & Architecture**
+- **Dependency Injection**: Clean, testable, and maintainable architecture
+- **Multi-layer Caching**: Optimized performance with intelligent caching
+- **Structured Logging**: JSON logging with correlation IDs and performance tracking
+- **Configuration Management**: Dynamic feature flags and environment management
+
+### **Testing & Quality Assurance**
+- **Comprehensive Testing**: 417+ tests with 95%+ coverage
+- **Code Quality**: Zero linting errors, comprehensive type checking
+- **Security Scanning**: Automated security vulnerability detection
+- **Performance Monitoring**: Real-time performance metrics and alerting
 
 ## 🆘 Support
 

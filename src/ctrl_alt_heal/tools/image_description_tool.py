@@ -42,9 +42,7 @@ def describe_image_tool(s3_bucket: str, s3_key: str, user_id: str) -> dict[str, 
     """
     Describes an image in S3 using a multi-modal model on Bedrock.
     """
-    logger.info(
-        f"describe_image_tool invoked with s3_bucket: '{s3_bucket}', s3_key: '{s3_key}', user_id: '{user_id}'"
-    )
+
     try:
         # 1. Get the image from S3
         response = s3_client.get_object(Bucket=s3_bucket, Key=s3_key)

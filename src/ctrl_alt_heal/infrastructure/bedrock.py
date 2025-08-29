@@ -4,7 +4,6 @@ import json
 import os
 from dataclasses import dataclass
 from typing import Any, ClassVar
-import copy
 
 import boto3
 import logging
@@ -84,19 +83,6 @@ class Bedrock(PrescriptionExtractor):
             "inferenceConfig": {"maxTokens": 400, "temperature": 0.2},
         }
 
-        # Optional debug logging of Bedrock inputs (sanitized)
-        if os.getenv("BEDROCK_DEBUG_IO") == "1":
-            try:
-                redacted = copy.deepcopy(request_body)
-                redacted["messages"][0]["content"][0]["image"]["source"]["bytes"] = (
-                    "<redacted>"
-                )
-                preview = json.dumps(redacted)[:2000]
-                logger.info("bedrock_io_input preview=%s", preview)
-            except Exception:
-                logger.info("bedrock_io_input")
-
-        logger.info("bedrock_invoke")
         try:
             resp = runtime.converse(
                 modelId=self.model_id,
@@ -105,10 +91,7 @@ class Bedrock(PrescriptionExtractor):
                 inferenceConfig=request_body["inferenceConfig"],
             )
             payload = resp["output"]["message"]["content"][0]["text"]
-            if os.getenv("BEDROCK_DEBUG_IO") == "1":
-                logger.info(
-                    "bedrock_io_output preview=%s len=%d", payload[:2000], len(payload)
-                )
+
             # Parse Nova response and extract the assistant text which should be JSON
             extracted: dict[str, Any] | None = None
             try:
@@ -128,7 +111,7 @@ class Bedrock(PrescriptionExtractor):
                                 pass
                 if extracted is None:
                     extracted = {"raw": payload}
-                logger.info(f"Extracted prescription data: {extracted}")
+
             except Exception:
                 extracted = {"raw": payload}
 

@@ -16,6 +16,7 @@ from ctrl_alt_heal.utils.timezone_utils import (
     now_in_user_timezone,
     get_medication_schedule_times_user_tz,
 )
+from ctrl_alt_heal.utils.time_parsing import parse_natural_times_input
 from ctrl_alt_heal.interface.telegram_sender import send_telegram_file
 import logging
 
@@ -29,70 +30,9 @@ def set_chat_id_for_file_sending(chat_id: str):
     _current_chat_id = chat_id
 
 
-def _parse_natural_time_input(time_input: str) -> str | None:
-    """
-    Parse natural time input to HH:MM format.
-    Handles formats like "10am", "2pm", "8pm", "10:30am", "14:30", etc.
-    """
-    if not time_input:
-        return None
-
-    time_input = time_input.lower().strip()
-
-    # Handle 24-hour format (already in HH:MM)
-    if ":" in time_input and ("am" not in time_input and "pm" not in time_input):
-        try:
-            # Validate it's a proper HH:MM format
-            datetime.strptime(time_input, "%H:%M")
-            return time_input
-        except ValueError:
-            return None
-
-    # Handle 12-hour format with AM/PM
-    import re
-
-    # Pattern for times like "10am", "2pm", "10:30am", "2:30pm"
-    pattern = r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)"
-    match = re.match(pattern, time_input)
-
-    if match:
-        hour = int(match.group(1))
-        minute = int(match.group(2)) if match.group(2) else 0
-        period = match.group(3)
-
-        # Validate hour and minute
-        if hour < 1 or hour > 12 or minute < 0 or minute > 59:
-            return None
-
-        # Convert to 24-hour format
-        if period == "pm" and hour != 12:
-            hour += 12
-        elif period == "am" and hour == 12:
-            hour = 0
-
-        return f"{hour:02d}:{minute:02d}"
-
-    return None
-
-
-def _parse_natural_times_input(times_input: str | list[str]) -> list[str]:
-    """
-    Parse natural time inputs to list of HH:MM format times.
-    Handles both string input (comma-separated) and list input.
-    """
-    if isinstance(times_input, str):
-        # Split by comma and clean up
-        time_strings = [t.strip() for t in times_input.split(",")]
-    else:
-        time_strings = times_input
-
-    parsed_times = []
-    for time_str in time_strings:
-        parsed_time = _parse_natural_time_input(time_str)
-        if parsed_time:
-            parsed_times.append(parsed_time)
-
-    return parsed_times
+# Use utility functions instead of duplicating time parsing logic
+# _parse_natural_time_input -> parse_natural_time_input
+# _parse_natural_times_input -> parse_natural_times_input
 
 
 @tool(
@@ -343,9 +283,7 @@ def generate_medication_ics_tool(
             )
             caption = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events. You can import this into any calendar app."
 
-            logger.info(f"Auto-sending ICS file to chat {_current_chat_id}: {filename}")
             send_telegram_file(_current_chat_id, ics_content, filename, caption)
-            logger.info("Successfully auto-sent ICS file")
 
             # Update the message to indicate file was sent
             message = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events and has been sent to you. You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). Each reminder will show {reminder_minutes} minutes before it's time to take your medication."
@@ -428,7 +366,7 @@ def generate_single_medication_ics_tool(
         }
 
     # Parse and validate times (supports natural formats like "10am", "2pm", "8pm")
-    parsed_times = _parse_natural_times_input(times)
+    parsed_times = parse_natural_times_input(times)
 
     if not parsed_times:
         return {
@@ -561,11 +499,7 @@ def generate_single_medication_ics_tool(
             filename = f"{medication_name.replace(' ', '_')}_reminders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics"
             caption = f"I've created a calendar file for {medication_name} with {events_created} daily reminders at {times_display} ({user.timezone}) for the next {duration_days} days!"
 
-            logger.info(
-                f"Auto-sending single ICS file to chat {_current_chat_id}: {filename}"
-            )
             send_telegram_file(_current_chat_id, ics_content, filename, caption)
-            logger.info("Successfully auto-sent single ICS file")
 
             # Update the message to indicate file was sent
             message = f"I've created a calendar file for {medication_name} with {events_created} daily reminders at {times_display} ({user.timezone}) for the next {duration_days} days and has been sent to you! Each reminder will show {reminder_minutes} minutes before it's time to take your medication. You can import this into any calendar app."

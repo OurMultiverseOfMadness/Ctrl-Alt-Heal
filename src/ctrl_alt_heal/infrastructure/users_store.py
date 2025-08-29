@@ -25,7 +25,10 @@ class UsersStore:
                 return User(**response["Item"])
             return None
         except ClientError as e:
-            print(f"Error getting user: {e}")
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting user: {e}")
             return None
 
     def upsert_user(self, user: User) -> None:

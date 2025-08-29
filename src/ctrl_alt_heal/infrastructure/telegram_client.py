@@ -18,4 +18,7 @@ class TelegramClient:
             response = requests.post(self.api_url, json=payload)
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            print(f"Error sending message to Telegram: {e}")
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error sending message to Telegram: {e}")

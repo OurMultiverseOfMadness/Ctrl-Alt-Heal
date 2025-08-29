@@ -5,14 +5,19 @@ from constructs import Construct
 class SecretsStack(Stack):
     """Stack for managing AWS Secrets Manager resources."""
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(
+        self, scope: Construct, construct_id: str, environment: str = "dev", **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        self.environment = environment
+        self.secret_prefix = f"ctrl-alt-heal/{environment}"
 
         # Create Serper API Secret
         self.serper_secret = secretsmanager.Secret(
             self,
-            "CtrlAltHealSerperSecretV2",
-            secret_name="ctrl-alt-heal/serper/api-key",
+            "SerperSecret",
+            secret_name=f"{self.secret_prefix}/serper/api-key",
             description="Serper API key for web search functionality",
             generate_secret_string=secretsmanager.SecretStringGenerator(
                 secret_string_template='{"api_key": "PLACEHOLDER"}',
@@ -21,11 +26,17 @@ class SecretsStack(Stack):
             ),
         )
 
-        # Import existing Telegram Bot Token Secret
-        self.telegram_secret = secretsmanager.Secret.from_secret_complete_arn(
+        # Create Telegram Bot Token Secret
+        self.telegram_secret = secretsmanager.Secret(
             self,
-            "CtrlAltHealTelegramSecret",
-            secret_complete_arn="arn:aws:secretsmanager:ap-southeast-1:532003627730:secret:ctrl-alt-heal/telegram/bot-token-iVVQbW",
+            "TelegramSecret",
+            secret_name=f"{self.secret_prefix}/telegram/bot-token",
+            description="Telegram bot token for the Ctrl-Alt-Heal bot",
+            generate_secret_string=secretsmanager.SecretStringGenerator(
+                secret_string_template='{"value": "PLACEHOLDER"}',
+                generate_string_key="value",
+                exclude_characters="\"'\\",
+            ),
         )
 
         # Note: The actual API keys should be updated manually after deployment

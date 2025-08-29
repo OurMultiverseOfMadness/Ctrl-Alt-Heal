@@ -14,16 +14,19 @@ class ApiGatewayStack(Stack):
         scope: Construct,
         construct_id: str,
         lambda_stack: LambdaStack,
+        environment: str = "dev",
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        log_group = logs.LogGroup(self, "CtrlAltHealApiAccessLogs")
+        self.environment = environment
+
+        log_group = logs.LogGroup(self, "ApiAccessLogs")
 
         api = apigw.LambdaRestApi(
             self,
-            "CtrlAltHealApi",
-            handler=lambda_stack.api_handler_function,
+            "Api",
+            handler=lambda_stack.worker_function,
             proxy=False,
             deploy_options=apigw.StageOptions(
                 access_log_destination=apigw.LogGroupLogDestination(log_group),
@@ -43,7 +46,7 @@ class ApiGatewayStack(Stack):
         )
 
         # Create the Lambda integration
-        webhook_integration = apigw.LambdaIntegration(lambda_stack.api_handler_function)
+        webhook_integration = apigw.LambdaIntegration(lambda_stack.worker_function)
 
         items = api.root.add_resource("webhook")
         items.add_method("POST", webhook_integration, api_key_required=False)

@@ -12,13 +12,13 @@ class FhirStore:
     """A class for interacting with the FHIR DynamoDB table."""
 
     def __init__(self, table_name: str | None = None) -> None:
-        self._table_name = table_name or os.getenv("FHIR_TABLE_NAME") or ""
+        self._table_name = table_name or os.getenv("FHIR_DATA_TABLE_NAME") or ""
         self._ddb = boto3.resource("dynamodb")
         self._table = self._ddb.Table(self._table_name) if self._table_name else None
 
     def _ensure_table(self) -> None:
         if self._table is None:
-            raise RuntimeError("FHIR_TABLE_NAME not configured")
+            raise RuntimeError("FHIR_DATA_TABLE_NAME not configured")
 
     def save_bundle(self, user_id: str, bundle: dict[str, Any]) -> str:
         """Saves a FHIR bundle to the database."""

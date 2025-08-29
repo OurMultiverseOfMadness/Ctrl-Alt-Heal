@@ -47,16 +47,7 @@ from ctrl_alt_heal.interface.telegram_sender import send_telegram_file
 from datetime import datetime
 from strands import tool
 
-# from ctrl_alt_heal.tools.google_auth_tool import (
-#     exchange_code_for_token_tool,
-#     generate_auth_url_tool,
-# )
-# from ctrl_alt_heal.tools.google_calendar_tool import (
-#     create_google_calendar_event_tool,
-#     delete_google_calendar_event_tool,
-#     list_google_calendar_events_tool,
-#     update_google_calendar_event_tool,
-# )
+
 from ctrl_alt_heal.domain.models import User
 
 s3 = boto3.client("s3")
@@ -416,63 +407,49 @@ def get_agent(
 
     system_prompt = "\n\n".join(system_prompt_parts)
 
-    # Debug: Log system prompt length and key sections
     logger = logging.getLogger(__name__)
-    logger.info(f"System prompt length: {len(system_prompt)} characters")
-    logger.info(
-        f"System prompt contains medication rules: {'medication' in system_prompt.lower()}"
-    )
-    logger.info(
-        f"System prompt contains set_medication_schedule: {'set_medication_schedule' in system_prompt}"
-    )
-
-    # Debug: Log tools being passed to agent
-    tools_list = [
-        describe_image_tool,
-        prescription_extraction_tool,
-        fhir_data_tool,
-        calendar_ics_tool,
-        search_tool,
-        update_user_profile_tool,
-        get_user_profile_tool,
-        save_user_notes_tool,
-        find_user_by_identity_tool,
-        create_user_with_identity_tool,
-        get_or_create_user_tool,
-        detect_user_timezone_tool,
-        suggest_timezone_from_language_tool,
-        auto_detect_timezone_tool,
-        wrapped_auto_schedule_medication_tool,
-        wrapped_set_medication_schedule_tool,
-        get_medication_schedule_tool,
-        clear_medication_schedule_tool,
-        get_user_prescriptions_tool,
-        show_all_medications_tool,
-        wrapped_generate_medication_ics_tool,
-        wrapped_generate_single_medication_ics_tool,
-    ]
-    logger.info(f"Number of tools being passed to agent: {len(tools_list)}")
-    # Debug: Log tool names safely
-    try:
-        tool_names = []
-        for tool in tools_list:
-            if hasattr(tool, "name"):
-                tool_names.append(tool.name)
-            elif hasattr(tool, "__name__"):
-                tool_names.append(tool.__name__)
-            else:
-                tool_names.append(str(type(tool)))
-        logger.info(f"Tool names being passed: {tool_names}")
-    except Exception as e:
-        logger.warning(f"Could not extract tool names: {e}")
-        logger.info(f"Tool types: {[type(tool) for tool in tools_list]}")
+    # tools_list = [
+    #     describe_image_tool,
+    #     prescription_extraction_tool,
+    #     fhir_data_tool,
+    #     calendar_ics_tool,
+    #     search_tool,
+    #     update_user_profile_tool,
+    #     get_user_profile_tool,
+    #     save_user_notes_tool,
+    #     find_user_by_identity_tool,
+    #     create_user_with_identity_tool,
+    #     get_or_create_user_tool,
+    #     detect_user_timezone_tool,
+    #     suggest_timezone_from_language_tool,
+    #     auto_detect_timezone_tool,
+    #     wrapped_auto_schedule_medication_tool,
+    #     wrapped_set_medication_schedule_tool,
+    #     get_medication_schedule_tool,
+    #     clear_medication_schedule_tool,
+    #     get_user_prescriptions_tool,
+    #     show_all_medications_tool,
+    #     wrapped_generate_medication_ics_tool,
+    #     wrapped_generate_single_medication_ics_tool,
+    # ]
 
     messages = []
 
-    # Add the current conversation history
+    # Add the optimized conversation history
     if conversation_history:
-        for m in conversation_history.history:
-            messages.append({"role": m.role, "content": [{"text": m.content}]})
+        from ctrl_alt_heal.utils.history_management import (
+            get_optimized_history_for_agent,
+            analyze_history_usage,
+        )
+
+        # Log history analysis for debugging
+        analysis = analyze_history_usage(conversation_history)
+        logger.info(
+            f"History analysis: {analysis['message_count']} messages, {analysis['estimated_tokens']} tokens, {analysis['token_usage_percentage']:.1f}% usage"
+        )
+
+        # Get optimized history for agent
+        messages = get_optimized_history_for_agent(conversation_history)
 
     # Create a bedrock model instance
     bedrock_model = BedrockModel(

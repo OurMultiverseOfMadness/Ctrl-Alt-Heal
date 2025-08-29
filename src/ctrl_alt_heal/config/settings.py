@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     google_client_secrets_file: str = "client_secret.json"
     google_redirect_uri: str = "https://your-redirect-uri.com/oauth2callback"
     database_table_name: str = ""
-    uploads_bucket_name: str
-    telegram_secret_name: str
+    uploads_bucket_name: str = "test-uploads-bucket"
+    telegram_secret_name: str = "test-telegram-secret"
 
     class Config:
         env_file = ".env"
@@ -21,11 +21,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-logger.info("--- Settings Loaded ---")
-logger.info(f"Bedrock Model ID: {settings.bedrock_model_id}")
-logger.info(f"Bedrock Multimodal Model ID: {settings.bedrock_multimodal_model_id}")
-logger.info(f"Database Table Name: {settings.database_table_name}")
-logger.info(f"Uploads Bucket Name: {settings.uploads_bucket_name}")
-logger.info(f"Telegram Secret Name: {settings.telegram_secret_name}")
-logger.info("----------------------")

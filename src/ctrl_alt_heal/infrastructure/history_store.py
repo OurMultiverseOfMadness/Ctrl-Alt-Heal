@@ -12,9 +12,9 @@ from ctrl_alt_heal.domain.models import ConversationHistory
 class HistoryStore:
     def __init__(self, table_name: str | None = None) -> None:
         """Initializes the HistoryStore."""
-        self.table_name = table_name or os.getenv("HISTORY_TABLE_NAME")
+        self.table_name = table_name or os.getenv("CONVERSATIONS_TABLE_NAME")
         if not self.table_name:
-            raise ValueError("HISTORY_TABLE_NAME environment variable not set.")
+            raise ValueError("CONVERSATIONS_TABLE_NAME environment variable not set.")
         self.ddb = boto3.resource("dynamodb")
         self.table = self.ddb.Table(self.table_name)
 
@@ -33,5 +33,8 @@ class HistoryStore:
             if response.get("Items"):
                 return ConversationHistory(**response["Items"][0])
         except ClientError as e:
-            print(f"Could not get history for {user_id}: {e}")
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Could not get history for {user_id}: {e}")
         return None

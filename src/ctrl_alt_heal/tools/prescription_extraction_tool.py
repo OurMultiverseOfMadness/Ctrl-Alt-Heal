@@ -33,21 +33,13 @@ def prescription_extraction_tool(
     logger = logging.getLogger(__name__)
 
     try:
-        logger.info(
-            f"prescription_extraction_tool called with s3_bucket: {s3_bucket}, s3_key: {s3_key}, user_id: {user_id}"
-        )
-
         extractor = Bedrock(model_id=settings.bedrock_multimodal_model_id)
-        logger.info("Bedrock extractor created successfully")
 
         result = extract_prescription(
             extractor,
             ExtractionInput(s3_bucket=s3_bucket, s3_key=s3_key),
             user_id=user_id,
         )
-
-        logger.info(f"extract_prescription returned: {result}")
-        logger.info(f"result.prescriptions: {result.prescriptions}")
 
         # Return a structured dictionary with the results
         if result.prescriptions:
@@ -63,7 +55,6 @@ def prescription_extraction_tool(
                     "extraction_confidence": result.confidence or 0.5,
                 },
             }
-            logger.info(f"Returning success response: {response}")
             return response
 
         error_response = {
@@ -72,7 +63,6 @@ def prescription_extraction_tool(
             "prescriptions": [],
             "count": 0,
         }
-        logger.info(f"Returning error response: {error_response}")
         return error_response
 
     except Exception as e:

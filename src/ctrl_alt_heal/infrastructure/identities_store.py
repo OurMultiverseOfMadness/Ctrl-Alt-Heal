@@ -28,7 +28,10 @@ class IdentitiesStore:
                 return response["Item"]["user_id"]
             return None
         except ClientError as e:
-            print(f"Error finding user by identity: {e}")
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error finding user by identity: {e}")
             return None
 
     def link_identity(self, identity: Identity) -> None:

@@ -9,13 +9,19 @@ from constructs import Construct
 
 
 class DatabaseStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(
+        self, scope: Construct, construct_id: str, environment: str = "dev", **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        self.environment = environment
+        self.table_prefix = f"ctrl_alt_heal_{environment}"
 
         # S3 bucket for storing user uploads
         self.uploads_bucket = s3.Bucket(
             self,
-            "CtrlAltHealUploadsBucket",
+            "UploadsBucket",
+            bucket_name=f"{self.table_prefix}-user-uploads",
             removal_policy=cdk.RemovalPolicy.DESTROY,  # Change in production
             auto_delete_objects=True,  # Change in production
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -25,7 +31,8 @@ class DatabaseStack(Stack):
 
         self.assets_bucket = s3.Bucket(
             self,
-            "CtrlAltHealAssetsBucket",
+            "AssetsBucket",
+            bucket_name=f"{self.table_prefix}-system-assets",
             removal_policy=cdk.RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             enforce_ssl=True,
@@ -42,23 +49,38 @@ class DatabaseStack(Stack):
             include=["system_prompt.txt"],
         )
 
-        # DynamoDB Table for Users
+        # DynamoDB Tables with improved naming and structure
         self.users_table = self._create_table(
-            table_name="ctrl-alt-heal-users", partition_key="user_id"
+            table_name=f"{self.table_prefix}_user_profiles",
+            partition_key="user_id",
+            description="User profiles and preferences",
         )
+
         self.identities_table = self._create_table(
-            table_name="ctrl-alt-heal-identities", partition_key="pk"
+            table_name=f"{self.table_prefix}_external_identities",
+            partition_key="identity_key",
+            description="External identity provider mappings (Telegram, etc.)",
         )
-        self.history_table = self._create_table(
-            table_name="ctrl-alt-heal-history",
+
+        self.conversations_table = self._create_table(
+            table_name=f"{self.table_prefix}_conversation_history",
             partition_key="user_id",
             sort_key="session_id",
+            description="Conversation history and session management",
         )
+
         self.prescriptions_table = self._create_table(
-            table_name="ctrl-alt-heal-prescriptions", partition_key="pk", sort_key="sk"
+            table_name=f"{self.table_prefix}_medical_prescriptions",
+            partition_key="user_id",
+            sort_key="prescription_id",
+            description="Medical prescriptions and medication information",
         )
-        self.fhir_table = self._create_table(
-            table_name="ctrl-alt-heal-fhir", partition_key="pk", sort_key="sk"
+
+        self.fhir_data_table = self._create_table(
+            table_name=f"{self.table_prefix}_fhir_resources",
+            partition_key="user_id",
+            sort_key="resource_id",
+            description="FHIR-compliant healthcare data resources",
         )
 
     def _create_table(
@@ -66,6 +88,7 @@ class DatabaseStack(Stack):
         table_name: str,
         partition_key: str,
         sort_key: str | None = None,
+        description: str | None = None,
     ) -> dynamodb.Table:
         pk = dynamodb.Attribute(name=partition_key, type=dynamodb.AttributeType.STRING)
         sk = (
@@ -81,4 +104,6 @@ class DatabaseStack(Stack):
             sort_key=sk,
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=cdk.RemovalPolicy.DESTROY,  # Change for production
+            point_in_time_recovery=True,  # Enable PITR for data protection
+            contributor_insights=True,  # Enable contributor insights for monitoring
         )

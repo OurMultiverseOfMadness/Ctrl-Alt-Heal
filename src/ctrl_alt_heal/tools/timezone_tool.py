@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from typing import Any
-import re
 
 from strands import tool
 
 from ctrl_alt_heal.infrastructure.users_store import UsersStore
+from ctrl_alt_heal.utils.timezone import (
+    normalize_timezone_input as _normalize_timezone_input,
+    suggest_timezone_from_language,
+)
 
 
 # Common timezone mappings for user-friendly input
@@ -51,68 +54,6 @@ TIMEZONE_MAPPINGS = {
     "beijing": "Asia/Shanghai",
     "shanghai": "Asia/Shanghai",
 }
-
-
-def _normalize_timezone_input(timezone_input: str) -> str | None:
-    """
-    Normalizes user timezone input to a standard timezone identifier.
-
-    Args:
-        timezone_input: User's timezone input (e.g., "EST", "New York", "UTC+5")
-
-    Returns:
-        Standardized timezone identifier or None if not recognized
-    """
-    if not timezone_input:
-        return None
-
-    # Clean the input
-    normalized = timezone_input.lower().strip()
-
-    # Direct mapping lookup
-    if normalized in TIMEZONE_MAPPINGS:
-        return TIMEZONE_MAPPINGS[normalized]
-
-    # Handle UTC offset formats like "UTC+5", "GMT-8", "+0530"
-    utc_pattern = r"(utc|gmt)?\s*([+-]?\d{1,2}):?(\d{2})?"
-    match = re.match(utc_pattern, normalized)
-    if match:
-        sign_hour = match.group(2)
-
-        # Parse the offset
-        try:
-            if sign_hour.startswith(("+", "-")):
-                sign = sign_hour[0]
-                hour = int(sign_hour[1:])
-            else:
-                sign = "+" if int(sign_hour) >= 0 else "-"
-                hour = abs(int(sign_hour))
-
-            # Format as Etc/GMT offset (note: Etc/GMT uses inverted signs)
-            if sign == "+":
-                return f"Etc/GMT-{hour}"
-            else:
-                return f"Etc/GMT+{hour}"
-        except ValueError:
-            pass
-
-    # If starts with timezone region, try to use as-is
-    if "/" in timezone_input and (
-        timezone_input.startswith(
-            (
-                "America/",
-                "Europe/",
-                "Asia/",
-                "Africa/",
-                "Pacific/",
-                "Indian/",
-                "Atlantic/",
-            )
-        )
-    ):
-        return timezone_input
-
-    return None
 
 
 @tool(
@@ -320,39 +261,9 @@ def suggest_timezone_from_language_tool(user_id: str) -> dict[str, Any]:
             "suggestions": [],
         }
 
-    # Language to timezone suggestions mapping
-    language_timezone_map = {
-        "en": [
-            "America/New_York",
-            "America/Los_Angeles",
-            "Europe/London",
-            "Australia/Sydney",
-        ],
-        "es": [
-            "America/Mexico_City",
-            "Europe/Madrid",
-            "America/Argentina/Buenos_Aires",
-        ],
-        "fr": ["Europe/Paris", "America/Montreal"],
-        "de": ["Europe/Berlin", "Europe/Vienna", "Europe/Zurich"],
-        "it": ["Europe/Rome"],
-        "pt": ["America/Sao_Paulo", "Europe/Lisbon"],
-        "ru": ["Europe/Moscow", "Asia/Yekaterinburg"],
-        "zh": ["Asia/Shanghai", "Asia/Hong_Kong", "Asia/Taipei"],
-        "ja": ["Asia/Tokyo"],
-        "ko": ["Asia/Seoul"],
-        "hi": ["Asia/Kolkata"],
-        "ar": ["Asia/Riyadh", "Africa/Cairo"],
-        "tr": ["Europe/Istanbul"],
-        "nl": ["Europe/Amsterdam"],
-        "sv": ["Europe/Stockholm"],
-        "no": ["Europe/Oslo"],
-        "da": ["Europe/Copenhagen"],
-        "fi": ["Europe/Helsinki"],
-        "pl": ["Europe/Warsaw"],
-    }
-
-    suggestions = language_timezone_map.get(language, [])
+    # Use the utility function to get timezone suggestion
+    suggested_timezone = suggest_timezone_from_language(language)
+    suggestions = [suggested_timezone] if suggested_timezone else []
 
     if suggestions:
         return {

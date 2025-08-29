@@ -18,20 +18,24 @@ from ctrl_alt_heal.interface.telegram_sender import (
 )
 from ctrl_alt_heal.infrastructure.users_store import UsersStore
 from ctrl_alt_heal.tools.registry import tool_registry
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 import logging
 import uuid
 from strands import Agent
 from ctrl_alt_heal.config import settings
+from ctrl_alt_heal.utils.session_utils import (
+    should_create_new_session,
+    create_new_session,
+    update_session_timestamp,
+    get_session_status,
+)
+from ctrl_alt_heal.utils.constants import SESSION_TIMEOUT_MINUTES
 
 # Set up logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-# Force Lambda redeployment to fix secret permissions
 
 s3_client = boto3.client("s3")
-
-SESSION_TIMEOUT_MINUTES = 30  # Define session timeout
 
 
 def process_agent_response(
@@ -44,14 +48,7 @@ def process_agent_response(
     """
     Processes the agent's response, handling tool calls recursively and sending the final message.
     """
-    logger.info(
-        f"--- Processing agent response. Raw response object: {agent_response_obj} ---"
-    )
-    logger.info(f"Agent response type: {type(agent_response_obj)}")
-    if isinstance(agent_response_obj, dict):
-        logger.info(f"Agent response keys: {list(agent_response_obj.keys())}")
     if isinstance(agent_response_obj, dict) and "tool_calls" in agent_response_obj:
-        logger.info("Tool call(s) detected in agent response.")
         tool_calls = agent_response_obj["tool_calls"]
         tool_results = []
         for tool_call in tool_calls:
@@ -59,33 +56,20 @@ def process_agent_response(
             tool_args = tool_call["args"]
             tool_call_id = tool_call["tool_call_id"]
 
-            logger.info(
-                f"Executing tool call: ID='{tool_call_id}', Name='{tool_name}', Args='{tool_args}'"
-            )
-
             # The agent sometimes forgets the user_id, so we add it back in
             if "user_id" not in tool_args:
-                logger.info("Injecting 'user_id' into tool arguments.")
                 tool_args["user_id"] = user.user_id
 
             # Get the tool function from the registry
             tool_function = tool_registry.get(tool_name)
-            logger.info(
-                f"Tool function found for '{tool_name}': {tool_function is not None}"
-            )
 
             if tool_function:
                 try:
                     # Execute the tool
-                    logger.info(f"Executing tool: '{tool_name}'...")
                     result = tool_function(**tool_args)
-                    logger.info(
-                        f"Tool '{tool_name}' executed successfully. Result: {result}"
-                    )
 
-                    # Debug: Log tool results for medication scheduling
+                    # Log medication scheduling errors
                     if tool_name == "set_medication_schedule":
-                        logger.info(f"set_medication_schedule tool result: {result}")
                         if isinstance(result, dict) and result.get("status") == "error":
                             logger.warning(
                                 f"set_medication_schedule failed: {result.get('message')}"
@@ -97,9 +81,6 @@ def process_agent_response(
                     if tool_name == "prescription_extraction" and isinstance(
                         result, dict
                     ):
-                        logger.info(
-                            f"Processing prescription_extraction result: {result}"
-                        )
                         if result.get("status") == "success":
                             # Format success response more naturally
                             content = f"SUCCESS: {result.get('message', 'Prescription extracted successfully')}. "
@@ -109,14 +90,14 @@ def process_agent_response(
                                 )
                                 for i, med in enumerate(result["prescriptions"], 1):
                                     content += f"{i}. {med.get('name', 'Unknown')} - {med.get('dosage', 'Not specified')}, {med.get('frequency', 'Not specified')}. "
-                            logger.info(f"Formatted success content: {content}")
+
                             tool_results.append(
                                 {"tool_result_id": tool_call_id, "content": content}
                             )
                         else:
                             # Format error response
                             content = f"ERROR: {result.get('message', 'Failed to extract prescription')}"
-                            logger.info(f"Formatted error content: {content}")
+
                             tool_results.append(
                                 {"tool_result_id": tool_call_id, "content": content}
                             )
@@ -139,9 +120,6 @@ def process_agent_response(
                                 "Here's your medication reminder calendar file!",
                             )
 
-                            logger.info(
-                                f"Sending automatically generated ICS file to user: {filename}"
-                            )
                             send_telegram_file(chat_id, ics_content, filename, caption)
 
                             # Format success response for the agent
@@ -171,7 +149,6 @@ def process_agent_response(
                                 "Here's your medication reminder calendar file!",
                             )
 
-                            logger.info(f"Sending ICS file to user: {filename}")
                             send_telegram_file(chat_id, ics_content, filename, caption)
 
                             # Format success response for the agent
@@ -207,9 +184,6 @@ def process_agent_response(
                     }
                 )
 
-        # Send tool results back to the agent
-        logger.info(f"Sending tool results back to agent: {tool_results}")
-
         # Emergency: Check for infinite loop
         if len(tool_results) > 10:
             logger.error(
@@ -222,13 +196,11 @@ def process_agent_response(
             return
 
         next_response = agent(tool_results=tool_results)
-        logger.info(f"Received next response from agent: {next_response}")
         # Process the next response, which could be another tool call or a final message
         process_agent_response(next_response, agent, user, history, chat_id)
 
     else:
         # No more tool calls, we have the final response
-        logger.info("No tool calls detected. Processing as final response.")
         final_message = str(agent_response_obj)
 
         # Debug: Check if agent promised to create reminders but didn't call tools
@@ -286,10 +258,8 @@ def process_agent_response(
                 )
 
                 if result.get("status") == "success":
-                    logger.info(
-                        "Successfully generated ICS file via fallback mechanism"
-                    )
                     # The tool will automatically send the file via Telegram
+                    pass
                 else:
                     logger.error(
                         f"Fallback ICS generation failed: {result.get('message')}"
@@ -297,24 +267,6 @@ def process_agent_response(
 
             except Exception as e:
                 logger.error(f"Error in fallback ICS generation: {e}")
-
-            # Additional check for specific medication mentions with times
-            if any(
-                time_phrase in response_lower
-                for time_phrase in ["am", "pm", "morning", "evening", "night"]
-            ) and any(
-                med_phrase in response_lower
-                for med_phrase in [
-                    "zoclear",
-                    "abciximab",
-                    "vomilast",
-                    "capsule",
-                    "tablet",
-                ]
-            ):
-                logger.error(
-                    "CRITICAL: Agent mentioned specific medications and times but didn't call set_medication_schedule tool. This is a major workflow failure."
-                )
 
         # Clean up XML-like tags from the response
         if "</thinking>" in final_message:
@@ -347,10 +299,10 @@ def process_agent_response(
             final_message = "I apologize, but I couldn't generate a proper response. Please try asking your question again."
 
         history.history.append(Message(role="assistant", content=final_message))
+        # Update session timestamp to keep it active
+        history = update_session_timestamp(history)
         HistoryStore().save_history(history)
-        logger.info("Agent generated response. Preparing to send to Telegram.")
         send_telegram_message(chat_id, final_message)
-        logger.info("Finished sending message to Telegram.")
 
 
 def handle_text_message(
@@ -359,6 +311,8 @@ def handle_text_message(
     """Handles an incoming text message."""
     text = message.get("text", "")
     history.history.append(Message(role="user", content=text))
+    # Update session timestamp to keep it active
+    history = update_session_timestamp(history)
 
     # Set chat ID for automatic file sending in tool wrappers
     set_chat_id_for_file_sending(chat_id)
@@ -366,37 +320,8 @@ def handle_text_message(
 
     agent = get_agent(user, history)
 
-    # Debug: Log available tools for text messages
-    logger.info(f"Agent object type: {type(agent)}")
-    logger.info(f"Agent has tools attribute: {hasattr(agent, 'tools')}")
-    if hasattr(agent, "tools"):
-        # Debug: Log tool names safely
-        try:
-            tool_names = []
-            for tool in agent.tools:
-                if hasattr(tool, "name"):
-                    tool_names.append(tool.name)
-                elif hasattr(tool, "__name__"):
-                    tool_names.append(tool.__name__)
-                else:
-                    tool_names.append(str(type(tool)))
-            logger.info(f"Agent tools: {tool_names}")
-        except Exception as e:
-            logger.warning(f"Could not extract agent tool names: {e}")
-            logger.info(f"Agent tool types: {[type(tool) for tool in agent.tools]}")
-    else:
-        logger.info("Agent does not have tools attribute")
-        # Try to find tools in other attributes
-        for attr in dir(agent):
-            if "tool" in attr.lower():
-                logger.info(f"Found tool-related attribute: {attr}")
-
     # Use agent() to execute tools directly
-    logger.info("Using agent() to execute tools directly")
     response_obj = agent()
-
-    # Debug: Log what the agent returned
-    logger.info(f"Agent returned: {type(response_obj)} - {response_obj}")
 
     # Process the agent's response
     process_agent_response(response_obj, agent, user, history, chat_id)
@@ -406,7 +331,7 @@ def handle_photo_message(
     message: dict[str, Any], chat_id: str, user: User, history: ConversationHistory
 ) -> None:
     """Handles photo messages by uploading to S3 and invoking the agent."""
-    logger.info("Photo message detected. Uploading to S3 and invoking agent.")
+
     photo = message["photo"][-1]
     file_id = photo["file_id"]
 
@@ -431,7 +356,6 @@ def handle_photo_message(
     bucket_name = settings.uploads_bucket_name
     s3_key = f"uploads/{user.user_id}/{str(uuid.uuid4())}.jpg"
     s3_client.put_object(Bucket=bucket_name, Key=s3_key, Body=image_bytes)
-    logger.info(f"Image uploaded to S3: s3://{bucket_name}/{s3_key}")
 
     # Create a simple, structured prompt instructing the agent to analyze the image.
     # The agent's system prompt will guide it to use the correct tools in sequence.
@@ -447,9 +371,9 @@ def handle_photo_message(
         f"The image details are: {args_json}"
     )
 
-    logger.info(f"Invoking agent with prompt: {agent_prompt}")
-
     history.history.append(Message(role="user", content=agent_prompt))
+    # Update session timestamp to keep it active
+    history = update_session_timestamp(history)
 
     # Set chat ID for automatic file sending in tool wrappers
     set_chat_id_for_file_sending(chat_id)
@@ -457,55 +381,10 @@ def handle_photo_message(
 
     # Invoke the agent
     agent = get_agent(user, history)
-    logger.info("Agent created successfully")
-
-    # Debug: Log available tools
-    if hasattr(agent, "tools"):
-        try:
-            tool_names = []
-            for tool in agent.tools:
-                if hasattr(tool, "name"):
-                    tool_names.append(tool.name)
-                elif hasattr(tool, "__name__"):
-                    tool_names.append(tool.__name__)
-                else:
-                    tool_names.append(str(type(tool)))
-            logger.info(f"Agent has access to tools: {tool_names}")
-        except Exception as e:
-            logger.warning(f"Could not extract tool names: {e}")
-            logger.info("Agent has tools but could not extract names")
-    else:
-        logger.info("Agent has access to tools: Tools not accessible")
-
-    # Use agent() to execute tools directly
-    logger.info("Using agent() to execute tools directly")
     agent_response_obj = agent()
-
-    logger.info(f"Raw agent response: {agent_response_obj}")
 
     # Process the agent's response
     process_agent_response(agent_response_obj, agent, user, history, chat_id)
-
-    # Debug: Check if agent made promises about creating reminders but didn't call tools
-    if isinstance(agent_response_obj, str):
-        response_text = agent_response_obj.lower()
-        if (
-            any(
-                phrase in response_text
-                for phrase in [
-                    "i'll create",
-                    "creating",
-                    "i'll set up",
-                    "setting up",
-                    "i'll schedule",
-                    "scheduling",
-                ]
-            )
-            and "tool" not in response_text
-        ):
-            logger.warning(
-                f"Agent promised to create/setup something but didn't call tools. Response: {agent_response_obj}"
-            )
 
 
 def handler(event: dict[str, Any], _context: Any) -> None:
@@ -562,24 +441,26 @@ def handler(event: dict[str, Any], _context: Any) -> None:
         history_store = HistoryStore()
         conversation_history = history_store.get_latest_history(user.user_id)
 
-        if conversation_history:
-            last_updated_time = datetime.fromisoformat(
-                conversation_history.last_updated
-            )
-            if datetime.now(UTC) - last_updated_time > timedelta(
-                minutes=SESSION_TIMEOUT_MINUTES
-            ):
-                logger.info("Session timed out. Creating a new session.")
-                conversation_history = ConversationHistory(user_id=user.user_id)
-            else:
-                logger.info("Continuing existing session.")
-        else:
-            logger.info("No existing session found. Creating a new one.")
-            conversation_history = ConversationHistory(user_id=user.user_id)
+        # Check if we should create a new session based on inactivity
+        should_create, reason = should_create_new_session(
+            conversation_history, SESSION_TIMEOUT_MINUTES
+        )
 
-        # Update timestamp and save immediately to keep session alive
-        conversation_history.last_updated = datetime.now(UTC).isoformat()
+        if should_create:
+            logger.info(f"Creating new session: {reason}")
+            conversation_history = create_new_session(user.user_id)
+        else:
+            logger.info(
+                "Continuing existing session - updating timestamp to keep it active"
+            )
+            conversation_history = update_session_timestamp(conversation_history)
+
+        # Save the session immediately to persist the changes
         history_store.save_history(conversation_history)
+
+        # Log session status for debugging
+        session_status = get_session_status(conversation_history)
+        logger.info(f"Session status: {session_status['reason']}")
 
         # --- Route to appropriate handler ---
         if "text" in message:
