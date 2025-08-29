@@ -27,6 +27,7 @@ from .medication_schedule_tool import (
     get_medication_schedule_tool,
     clear_medication_schedule_tool,
     get_user_prescriptions_tool,
+    show_all_medications_tool,
 )
 from .medication_ics_tool import (
     generate_medication_ics_tool,
@@ -53,6 +54,7 @@ tool_registry: dict[str, Callable[..., Any]] = {
     "get_medication_schedule": get_medication_schedule_tool,
     "clear_medication_schedule": clear_medication_schedule_tool,
     "get_user_prescriptions": get_user_prescriptions_tool,
+    "show_all_medications": show_all_medications_tool,
     "generate_medication_ics": generate_medication_ics_tool,
     "generate_single_medication_ics": generate_single_medication_ics_tool,
 }

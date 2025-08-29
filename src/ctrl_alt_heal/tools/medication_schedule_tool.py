@@ -399,13 +399,35 @@ def get_user_prescriptions_tool(user_id: str) -> dict[str, Any]:
             # This prescription doesn't have a schedule
             unscheduled_prescriptions.append(prescription_info)
 
-    # Format response - keep it concise for Telegram
+    # Format response with actual medication details
     if scheduled_prescriptions and unscheduled_prescriptions:
-        message = f"I found {len(scheduled_prescriptions)} scheduled and {len(unscheduled_prescriptions)} unscheduled medications. Would you like me to help set up schedules for the unscheduled ones?"
+        message = f"I found {len(scheduled_prescriptions)} scheduled and {len(unscheduled_prescriptions)} unscheduled medications.\n\n"
+        if unscheduled_prescriptions:
+            message += "**Medications without schedules:**\n"
+            for med in unscheduled_prescriptions[
+                :5
+            ]:  # Show first 5 to avoid too long messages
+                message += f"• {med['name']} ({med['dosage']}) - {med['frequency']}\n"
+            if len(unscheduled_prescriptions) > 5:
+                message += f"... and {len(unscheduled_prescriptions) - 5} more\n"
+            message += "\nWould you like me to help set up schedules for any of these?"
     elif scheduled_prescriptions:
-        message = f"You have {len(scheduled_prescriptions)} medications with schedules set up. Would you like to see the details or set up more schedules?"
+        message = f"You have {len(scheduled_prescriptions)} medications with schedules set up:\n\n"
+        for med in scheduled_prescriptions[:5]:
+            times_str = ", ".join(med["schedule_times"])
+            message += f"• {med['name']} ({med['dosage']}) - {times_str}\n"
+        if len(scheduled_prescriptions) > 5:
+            message += f"... and {len(scheduled_prescriptions) - 5} more\n"
+        message += "\nWould you like to see all details or set up more schedules?"
     elif unscheduled_prescriptions:
-        message = f"You have {len(unscheduled_prescriptions)} medications without schedules. Would you like me to help you set up reminder times for them?"
+        message = f"You have {len(unscheduled_prescriptions)} medications without schedules:\n\n"
+        for med in unscheduled_prescriptions[
+            :5
+        ]:  # Show first 5 to avoid too long messages
+            message += f"• {med['name']} ({med['dosage']}) - {med['frequency']}\n"
+        if len(unscheduled_prescriptions) > 5:
+            message += f"... and {len(unscheduled_prescriptions) - 5} more\n"
+        message += "\nWould you like me to help you set up reminder times for any of these medications?"
     else:
         message = "You don't have any active prescriptions on file."
 
@@ -417,4 +439,88 @@ def get_user_prescriptions_tool(user_id: str) -> dict[str, Any]:
         "unscheduled_prescriptions": unscheduled_prescriptions,
         "scheduled_count": len(scheduled_prescriptions),
         "unscheduled_count": len(unscheduled_prescriptions),
+    }
+
+
+@tool(
+    name="show_all_medications",
+    description=(
+        "Shows all of the user's medications with full details. "
+        "Use this when a user wants to see their complete medication list. "
+        "Example triggers: 'Show me all my medications', 'List all my prescriptions', "
+        "'What medications am I taking?'"
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+        },
+        "required": ["user_id"],
+    },
+)
+def show_all_medications_tool(user_id: str) -> dict[str, Any]:
+    """
+    Shows all of the user's medications with complete details.
+    """
+    users_store = UsersStore()
+    prescriptions_store = PrescriptionsStore()
+
+    # Get user for timezone info
+    user = users_store.get_user(user_id)
+    if not user:
+        return {"status": "error", "message": "User not found."}
+
+    # Get all prescriptions
+    prescriptions = prescriptions_store.list_prescriptions(user_id, status="active")
+
+    if not prescriptions:
+        return {
+            "status": "info",
+            "message": "You don't have any prescriptions on file yet. "
+            "You can upload a prescription image or tell me about your medications.",
+            "prescriptions": [],
+        }
+
+    # Format complete medication list
+    message = "**Your Complete Medication List:**\n\n"
+
+    for i, prescription in enumerate(prescriptions, 1):
+        name = prescription.get("name", "")
+        dosage = prescription.get("dosageText", "")
+        frequency = prescription.get("frequencyText", "")
+        status = prescription.get("status", "")
+
+        schedule_times = prescription.get("scheduleTimes")
+        schedule_until = prescription.get("scheduleUntil")
+
+        message += f"**{i}. {name}**\n"
+        message += f"   Dosage: {dosage}\n"
+        message += f"   Frequency: {frequency}\n"
+        message += f"   Status: {status}\n"
+
+        if schedule_times and schedule_until:
+            if user.timezone:
+                try:
+                    user_times = get_medication_schedule_times_user_tz(
+                        user, schedule_times
+                    )
+                    times_str = ", ".join(user_times)
+                except Exception:
+                    times_str = ", ".join(schedule_times)
+            else:
+                times_str = ", ".join(schedule_times)
+
+            message += f"   Schedule: {times_str} until {schedule_until}\n"
+        else:
+            message += "   Schedule: No reminder schedule set\n"
+
+        message += "\n"
+
+    message += "Would you like me to help you set up reminder schedules for any medications that don't have them?"
+
+    return {
+        "status": "success",
+        "message": message,
+        "prescriptions": prescriptions,
+        "total_count": len(prescriptions),
     }
