@@ -322,3 +322,99 @@ def clear_medication_schedule_tool(
         "You won't receive any more reminders for this medication.",
         "prescription_name": matching_prescription["name"],
     }
+
+
+@tool(
+    name="get_user_prescriptions",
+    description=(
+        "Gets all of the user's prescriptions (both scheduled and unscheduled). "
+        "Use this when you need to see what medications the user has before setting up schedules. "
+        "Example triggers: 'What prescriptions do I have?', 'Show me my medications', "
+        "'What medicines am I taking?'"
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "user_id": {"type": "string"},
+        },
+        "required": ["user_id"],
+    },
+)
+def get_user_prescriptions_tool(user_id: str) -> dict[str, Any]:
+    """
+    Gets all of the user's prescriptions, showing which ones have schedules and which don't.
+    """
+    users_store = UsersStore()
+    prescriptions_store = PrescriptionsStore()
+
+    # Get user for timezone info
+    user = users_store.get_user(user_id)
+    if not user:
+        return {"status": "error", "message": "User not found."}
+
+    # Get all prescriptions
+    prescriptions = prescriptions_store.list_prescriptions(user_id, status="active")
+
+    if not prescriptions:
+        return {
+            "status": "info",
+            "message": "You don't have any prescriptions on file yet. "
+            "You can upload a prescription image or tell me about your medications.",
+            "prescriptions": [],
+            "scheduled_count": 0,
+            "unscheduled_count": 0,
+        }
+
+    scheduled_prescriptions = []
+    unscheduled_prescriptions = []
+
+    for prescription in prescriptions:
+        schedule_times = prescription.get("scheduleTimes")
+        schedule_until = prescription.get("scheduleUntil")
+
+        prescription_info = {
+            "name": prescription.get("name", ""),
+            "dosage": prescription.get("dosageText", ""),
+            "frequency": prescription.get("frequencyText", ""),
+            "status": prescription.get("status", ""),
+        }
+
+        if schedule_times and schedule_until:
+            # This prescription has a schedule
+            if user.timezone:
+                try:
+                    user_times = get_medication_schedule_times_user_tz(
+                        user, schedule_times
+                    )
+                except Exception:
+                    user_times = schedule_times
+            else:
+                user_times = schedule_times
+
+            prescription_info["schedule_times"] = user_times
+            prescription_info["schedule_until"] = schedule_until
+            prescription_info["timezone"] = user.timezone or "UTC"
+            scheduled_prescriptions.append(prescription_info)
+        else:
+            # This prescription doesn't have a schedule
+            unscheduled_prescriptions.append(prescription_info)
+
+    # Format response - keep it concise for Telegram
+    if scheduled_prescriptions and unscheduled_prescriptions:
+        message = f"I found {len(scheduled_prescriptions)} scheduled and {len(unscheduled_prescriptions)} unscheduled medications. Would you like me to help set up schedules for the unscheduled ones?"
+    elif scheduled_prescriptions:
+        message = f"You have {len(scheduled_prescriptions)} medications with schedules set up. Would you like to see the details or set up more schedules?"
+    elif unscheduled_prescriptions:
+        message = f"You have {len(unscheduled_prescriptions)} medications without schedules. Would you like me to help you set up reminder times for them?"
+    else:
+        message = "You don't have any active prescriptions on file."
+
+    return {
+        "status": "success",
+        "message": message,
+        "prescriptions": prescriptions,
+        "scheduled_prescriptions": scheduled_prescriptions,
+        "unscheduled_prescriptions": unscheduled_prescriptions,
+        "scheduled_count": len(scheduled_prescriptions),
+        "unscheduled_count": len(unscheduled_prescriptions),
+    }

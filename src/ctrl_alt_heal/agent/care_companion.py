@@ -34,6 +34,7 @@ from ctrl_alt_heal.tools.medication_schedule_tool import (
     set_medication_schedule_tool,
     get_medication_schedule_tool,
     clear_medication_schedule_tool,
+    get_user_prescriptions_tool,
 )
 from ctrl_alt_heal.tools.medication_ics_tool import (
     generate_medication_ics_tool,
@@ -119,6 +120,7 @@ def get_agent(
             set_medication_schedule_tool,
             get_medication_schedule_tool,
             clear_medication_schedule_tool,
+            get_user_prescriptions_tool,
             generate_medication_ics_tool,
             generate_single_medication_ics_tool,
         ],
