@@ -72,6 +72,16 @@ def process_agent_response(
                     logger.info(
                         f"Tool '{tool_name}' executed successfully. Result: {result}"
                     )
+
+                    # Debug: Log tool results for medication scheduling
+                    if tool_name == "set_medication_schedule":
+                        logger.info(f"set_medication_schedule tool result: {result}")
+                        if isinstance(result, dict) and result.get("status") == "error":
+                            logger.warning(
+                                f"set_medication_schedule failed: {result.get('message')}"
+                            )
+                            if result.get("needs_timezone"):
+                                logger.warning("Tool indicates user needs timezone set")
                     # Format the result for the agent
                     # For prescription extraction, provide a more natural response format
                     if tool_name == "prescription_extraction" and isinstance(
