@@ -311,10 +311,10 @@ def process_agent_response(
             logger.error(f"Failed to send final message to chat {chat_id}: {e}")
             # Try one more time with plain text as fallback
             try:
+                from ctrl_alt_heal.utils.telegram_formatter import TelegramParseMode
                 from ctrl_alt_heal.interface.telegram_sender import (
                     send_telegram_message,
                 )
-                from ctrl_alt_heal.utils.telegram_formatter import TelegramParseMode
 
                 send_telegram_message(
                     chat_id, final_message, parse_mode=TelegramParseMode.PLAIN_TEXT

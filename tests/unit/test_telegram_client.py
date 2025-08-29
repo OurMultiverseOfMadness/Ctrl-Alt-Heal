@@ -10,6 +10,8 @@ from ctrl_alt_heal.interface.telegram_client import (
     TelegramError,
     TelegramErrorType,
     get_telegram_client,
+)
+from ctrl_alt_heal.interface.telegram_sender import (
     send_telegram_message,
     send_telegram_file,
     get_telegram_file_path,
@@ -449,7 +451,7 @@ class TestGlobalFunctions:
         # Should return the same client (singleton behavior)
         assert client1 is client2
 
-    @patch("ctrl_alt_heal.interface.telegram_client.get_telegram_client")
+    @patch("ctrl_alt_heal.interface.telegram_sender.get_telegram_client")
     def test_send_telegram_message(self, mock_get_client):
         """Test send_telegram_message function."""
         mock_client = Mock()
@@ -459,9 +461,11 @@ class TestGlobalFunctions:
         result = send_telegram_message("12345", "Hello world")
 
         assert result == [{"message_id": 123}]
-        mock_client.send_message.assert_called_once_with("12345", "Hello world", True)
+        mock_client.send_message.assert_called_once_with(
+            "12345", "Hello world", split_long=True
+        )
 
-    @patch("ctrl_alt_heal.interface.telegram_client.get_telegram_client")
+    @patch("ctrl_alt_heal.interface.telegram_sender.get_telegram_client")
     def test_send_telegram_file(self, mock_get_client):
         """Test send_telegram_file function."""
         mock_client = Mock()
@@ -475,7 +479,7 @@ class TestGlobalFunctions:
             "12345", "content", "test.txt", "caption"
         )
 
-    @patch("ctrl_alt_heal.interface.telegram_client.get_telegram_client")
+    @patch("ctrl_alt_heal.interface.telegram_sender.get_telegram_client")
     def test_get_telegram_file_path(self, mock_get_client):
         """Test get_telegram_file_path function."""
         mock_client = Mock()

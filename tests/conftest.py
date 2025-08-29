@@ -97,9 +97,7 @@ def mock_aws_services():
 @pytest.fixture
 def mock_telegram():
     """Mock Telegram API for testing."""
-    with patch(
-        "ctrl_alt_heal.infrastructure.telegram_client.requests.post"
-    ) as mock_post:
+    with patch("ctrl_alt_heal.interface.telegram_client.requests.post") as mock_post:
         mock_response = Mock()
         mock_response.json.return_value = {"ok": True, "result": {}}
         mock_response.raise_for_status.return_value = None
