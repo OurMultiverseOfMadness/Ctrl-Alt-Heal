@@ -195,6 +195,9 @@ def generate_medication_ics_tool(
 
     events_created = 0
 
+    # First, collect all medications and their times to group them
+    time_medications = {}  # time_str -> list of (med, end_date) tuples
+
     for med in scheduled_prescriptions:
         # Convert UTC times to user timezone for display
         try:
@@ -215,45 +218,81 @@ def generate_medication_ics_tool(
             # Default to 30 days from now if parsing fails
             end_date_user_tz = (now_in_user_timezone(user) + timedelta(days=30)).date()
 
-        # Create events for each time
+        # Group this medication by its times
         for time_str in user_times:
-            try:
-                # Parse time
-                time_obj = datetime.strptime(time_str, "%H:%M").time()
+            if time_str not in time_medications:
+                time_medications[time_str] = []
+            time_medications[time_str].append((med, end_date_user_tz))
 
-                # Create first event (today if time hasn't passed, tomorrow if it has)
-                now_user = now_in_user_timezone(user)
-                start_date = now_user.date()
+    # Now create merged events for each time slot
+    for time_str, medications in time_medications.items():
+        try:
+            # Parse time
+            time_obj = datetime.strptime(time_str, "%H:%M").time()
 
-                # If the time has already passed today, start tomorrow
-                if time_obj <= now_user.time():
-                    start_date = start_date + timedelta(days=1)
+            # Create first event (today if time hasn't passed, tomorrow if it has)
+            now_user = now_in_user_timezone(user)
+            start_date = now_user.date()
 
-                # Create event
+            # If the time has already passed today, start tomorrow
+            if time_obj <= now_user.time():
+                start_date = start_date + timedelta(days=1)
+
+            # Find the latest end date among all medications for this time
+            latest_end_date = max(end_date for _, end_date in medications)
+
+            # Calculate remaining days until end date
+            days_until_end = (latest_end_date - start_date).days
+
+            # Create events for each day
+            for day_offset in range(min(days_until_end, 30)):
+                event_date = start_date + timedelta(days=day_offset)
+                if event_date > latest_end_date:
+                    break
+
+                # Create merged event
                 event = Event()
 
-                # Event title
-                event_title = f"💊 Take {med['name']}"
-                if include_notes and med["dosage"]:
-                    event_title += f" ({med['dosage']})"
+                # Event title - show count if multiple medications
+                if len(medications) == 1:
+                    med, _ = medications[0]
+                    event_title = f"💊 Take {med['name']}"
+                    if include_notes and med["dosage"]:
+                        event_title += f" ({med['dosage']})"
+                else:
+                    event_title = f"💊 Take {len(medications)} medications"
 
                 event.name = event_title
 
                 # Event timing (15-minute duration)
-                start_datetime = datetime.combine(start_date, time_obj)
+                start_datetime = datetime.combine(event_date, time_obj)
                 start_datetime = start_datetime.replace(tzinfo=user_tz)
                 end_datetime = start_datetime + timedelta(minutes=15)
 
                 event.begin = start_datetime
                 event.end = end_datetime
 
-                # Event description
-                description_parts = [f"Time to take your {med['name']}!"]
-                if include_notes:
-                    if med["dosage"]:
-                        description_parts.append(f"Dosage: {med['dosage']}")
-                    if med["frequency"]:
-                        description_parts.append(f"Frequency: {med['frequency']}")
+                # Event description - list all medications
+                description_parts = []
+                if len(medications) == 1:
+                    med, _ = medications[0]
+                    description_parts.append(f"Time to take your {med['name']}!")
+                    if include_notes:
+                        if med["dosage"]:
+                            description_parts.append(f"Dosage: {med['dosage']}")
+                        if med["frequency"]:
+                            description_parts.append(f"Frequency: {med['frequency']}")
+                else:
+                    description_parts.append(
+                        f"Time to take {len(medications)} medications:"
+                    )
+                    for i, (med, _) in enumerate(medications, 1):
+                        med_desc = f"{i}. {med['name']}"
+                        if include_notes and med["dosage"]:
+                            med_desc += f" - {med['dosage']}"
+                        if include_notes and med["frequency"]:
+                            med_desc += f" ({med['frequency']})"
+                        description_parts.append(med_desc)
 
                 description_parts.append(
                     "\n--- Created by Cara, your Care Companion ---"
@@ -263,59 +302,21 @@ def generate_medication_ics_tool(
                 # Add reminder alarm
                 if reminder_minutes > 0:
                     alarm = DisplayAlarm(trigger=timedelta(minutes=-reminder_minutes))
-                    alarm.description = (
-                        f"Take {med['name']} in {reminder_minutes} minutes"
-                    )
-                    event.alarms.append(alarm)
-
-                # Create individual daily events instead of using RRULE (more compatible)
-                base_event = event
-
-                # Add the first event
-                calendar.events.add(base_event)
-                events_created += 1
-
-                # Calculate remaining days until end date
-                days_until_end = (end_date_user_tz - start_date).days
-
-                # Create additional daily events
-                for day_offset in range(1, min(days_until_end, 30)):
-                    next_date = start_date + timedelta(days=day_offset)
-                    if next_date > end_date_user_tz:
-                        break
-
-                    # Create copy of event for next day
-                    next_event = Event()
-                    next_event.name = base_event.name
-                    next_event.description = base_event.description
-
-                    # Update timing for next day
-                    next_start = datetime.combine(next_date, time_obj)
-                    next_start = next_start.replace(tzinfo=user_tz)
-                    next_end = next_start + timedelta(minutes=15)
-
-                    next_event.begin = next_start
-                    next_event.end = next_end
-
-                    # Copy alarms
-                    if reminder_minutes > 0:
-                        next_alarm = DisplayAlarm(
-                            trigger=timedelta(minutes=-reminder_minutes)
-                        )
-                        next_alarm.description = (
+                    if len(medications) == 1:
+                        med, _ = medications[0]
+                        alarm.description = (
                             f"Take {med['name']} in {reminder_minutes} minutes"
                         )
-                        next_event.alarms.append(next_alarm)
+                    else:
+                        alarm.description = f"Take {len(medications)} medications in {reminder_minutes} minutes"
+                    event.alarms.append(alarm)
 
-                    calendar.events.add(next_event)
-                    events_created += 1
+                calendar.events.add(event)
+                events_created += 1
 
-                # Skip the regular calendar.events.add since we already added events above
-                continue
-
-            except Exception:
-                # Skip this time if parsing fails
-                continue
+        except Exception:
+            # Skip this time if parsing fails
+            continue
 
     if events_created == 0:
         return {

@@ -330,7 +330,20 @@ def process_agent_response(
         # Remove any other XML-like tags that might be present
         import re
 
+        # More comprehensive cleaning of thinking tags and other unwanted content
+        final_message = re.sub(
+            r"<thinking>.*?</thinking>", "", final_message, flags=re.DOTALL
+        )
+        final_message = re.sub(r"<thinking>.*", "", final_message, flags=re.DOTALL)
         final_message = re.sub(r"<[^>]+>", "", final_message).strip()
+
+        # Clean up any extra whitespace and empty lines
+        final_message = re.sub(r"\n\s*\n\s*\n", "\n\n", final_message)
+        final_message = final_message.strip()
+
+        # If the message is empty after cleaning, provide a default response
+        if not final_message:
+            final_message = "I apologize, but I couldn't generate a proper response. Please try asking your question again."
 
         history.history.append(Message(role="assistant", content=final_message))
         HistoryStore().save_history(history)

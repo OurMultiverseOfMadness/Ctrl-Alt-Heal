@@ -4,6 +4,7 @@ import aws_cdk as cdk
 from stacks.api_gateway_stack import ApiGatewayStack
 from stacks.database_stack import DatabaseStack
 from stacks.lambda_stack import LambdaStack
+from stacks.secrets_stack import SecretsStack
 from stacks.sqs_stack import SqsStack
 
 app = cdk.App()
@@ -18,6 +19,13 @@ database_stack = DatabaseStack(
     env=aws_env,
 )
 
+# Create the secrets stack
+secrets_stack = SecretsStack(
+    app,
+    "CtrlAltHealSecretsStack",
+    env=aws_env,
+)
+
 # Create the SQS stack
 sqs_stack = SqsStack(
     app,
@@ -25,11 +33,12 @@ sqs_stack = SqsStack(
     env=aws_env,
 )
 
-# Create the Lambda stack, passing the database and SQS stacks
+# Create the Lambda stack, passing the database, secrets, and SQS stacks
 lambda_stack = LambdaStack(
     app,
     "CtrlAltHealLambdaStack",
     database_stack=database_stack,
+    secrets_stack=secrets_stack,
     sqs_stack=sqs_stack,
     env=aws_env,
 )

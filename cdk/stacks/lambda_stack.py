@@ -8,6 +8,7 @@ from aws_cdk import (
 from constructs import Construct
 
 from .database_stack import DatabaseStack
+from .secrets_stack import SecretsStack
 from .sqs_stack import SqsStack
 
 
@@ -17,6 +18,7 @@ class LambdaStack(Stack):
         scope: Construct,
         construct_id: str,
         database_stack: DatabaseStack,
+        secrets_stack: SecretsStack,
         sqs_stack: SqsStack,
         **kwargs,
     ) -> None:
@@ -54,10 +56,14 @@ class LambdaStack(Stack):
         database_stack.uploads_bucket.grant_read_write(worker_role)
         database_stack.assets_bucket.grant_read(worker_role)
 
+        # Grant access to specific secrets
         worker_role.add_to_policy(
             iam.PolicyStatement(
                 actions=["secretsmanager:GetSecretValue"],
-                resources=["*"],  # Be more specific in production
+                resources=[
+                    secrets_stack.serper_secret.secret_arn,
+                    secrets_stack.telegram_secret.secret_arn,
+                ],
             )
         )
         # Grant the Lambda function permissions to invoke the Bedrock model
@@ -120,6 +126,18 @@ class LambdaStack(Stack):
                 )
             ],
         )
+
+        # Grant access to secrets for API handler (in case it needs to access them)
+        api_handler_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["secretsmanager:GetSecretValue"],
+                resources=[
+                    secrets_stack.serper_secret.secret_arn,
+                    secrets_stack.telegram_secret.secret_arn,
+                ],
+            )
+        )
+
         # Grant SQS permissions to the api handler role
         sqs_stack.messages_queue.grant_send_messages(api_handler_role)
 
