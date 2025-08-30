@@ -127,12 +127,17 @@ class EnvironmentValidator:
 
     def get_environment_summary(self) -> Dict[str, Any]:
         """Get environment configuration summary."""
-        summary = {"valid": True, "variables": {}, "missing_required": [], "errors": []}
+        summary: Dict[str, Any] = {
+            "valid": True,
+            "variables": {},
+            "missing_required": [],
+            "errors": [],
+        }
 
         # Check all variables
         for var_name, rules in self._validation_rules.items():
             value = os.getenv(var_name)
-            summary["variables"][var_name] = {
+            summary["variables"][var_name] = {  # type: ignore
                 "set": value is not None,
                 "required": rules.get("required", False),
                 "description": rules.get("description", ""),

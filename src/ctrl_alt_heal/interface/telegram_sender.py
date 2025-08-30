@@ -168,11 +168,11 @@ def send_telegram_file(
             try:
                 error_message = f"I couldn't send the file '{filename}'. Please try again in a moment."
                 error_client = get_telegram_client(TelegramParseMode.PLAIN_TEXT)
-                result = error_client.send_message(
+                results = error_client.send_message(
                     chat_id, error_message, split_long=False
                 )
                 logger.info(f"Fallback error message sent to chat {chat_id}")
-                return result
+                return results[0] if results else None
             except Exception as fallback_error:
                 logger.error(f"Fallback message also failed: {fallback_error}")
 
@@ -182,9 +182,11 @@ def send_telegram_file(
                 "I'm having trouble sending files right now. Please try again later."
             )
             error_client = get_telegram_client(TelegramParseMode.PLAIN_TEXT)
-            result = error_client.send_message(chat_id, error_message, split_long=False)
+            results = error_client.send_message(
+                chat_id, error_message, split_long=False
+            )
             logger.info(f"Error message sent to chat {chat_id}")
-            return result
+            return results[0] if results else None
         except Exception:
             logger.error("Failed to send error message to user")
 

@@ -127,7 +127,11 @@ class AWSServiceError(CtrlAltHealException):
         operation: Optional[str] = None,
         error_code: Optional[str] = None,
     ):
-        details = {"service": service, "operation": operation, "error_code": error_code}
+        details = {
+            "service": service,
+            "operation": operation,
+            "error_code": str(error_code) if error_code else None,
+        }
         super().__init__(message, details)
 
 
@@ -144,7 +148,7 @@ class TelegramAPIError(CtrlAltHealException):
         if chat_id:
             details["chat_id"] = chat_id
         if error_code:
-            details["error_code"] = error_code
+            details["error_code"] = str(error_code)
         super().__init__(message, details)
 
 
@@ -224,5 +228,5 @@ class NetworkError(CtrlAltHealException):
         if url:
             details["url"] = url
         if status_code:
-            details["status_code"] = status_code
+            details["status_code"] = str(status_code)
         super().__init__(message, details)

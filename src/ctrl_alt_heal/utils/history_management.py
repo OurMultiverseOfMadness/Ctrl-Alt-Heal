@@ -78,7 +78,7 @@ def extract_key_information(messages: List[Message]) -> Dict[str, Any]:
     Returns:
         Dictionary containing key information
     """
-    key_info = {
+    key_info: Dict[str, set] = {
         "topics": set(),
         "medications": set(),
         "timezones": set(),

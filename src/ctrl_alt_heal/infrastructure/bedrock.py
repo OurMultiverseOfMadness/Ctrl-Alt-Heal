@@ -209,7 +209,7 @@ class Bedrock(PrescriptionExtractor):
                                 extra_fields[k] = v
 
                         if extra_fields:
-                            mapped_data["extra_fields"] = extra_fields
+                            mapped_data["extra_fields"] = extra_fields  # type: ignore
 
                         # Ensure required fields have defaults if missing
                         if "name" not in mapped_data or not mapped_data["name"]:
@@ -227,8 +227,22 @@ class Bedrock(PrescriptionExtractor):
                         ):
                             mapped_data["totalAmount"] = "Not specified"
 
+                        # Convert duration_days to int if present
+                        if (
+                            "duration_days" in mapped_data
+                            and mapped_data["duration_days"]
+                        ):
+                            try:
+                                mapped_data["duration_days"] = int(
+                                    mapped_data["duration_days"]
+                                )  # type: ignore
+                            except (ValueError, TypeError):
+                                mapped_data["duration_days"] = None  # type: ignore
+                        else:
+                            mapped_data["duration_days"] = None  # type: ignore
+
                         # Pydantic will validate the data here
-                        prescriptions.append(Prescription(**mapped_data))
+                        prescriptions.append(Prescription(**mapped_data))  # type: ignore
 
             return ExtractionResult(
                 raw_json=extracted, confidence=0.5, prescriptions=prescriptions

@@ -158,16 +158,19 @@ BEDROCK_MULTIMODAL_MODEL_ID=apac.amazon.nova-lite-v1:0
 ### Development
 
 ```bash
-# Run tests
-pytest
+# Run comprehensive quality checks (source files only)
+./scripts/run_quality_checks.sh
+
+# Run individual checks
+pytest tests/ -v                    # Run tests
+pre-commit run --files src/ tests/ *.py *.md *.yaml *.yml *.json *.toml *.sh  # Linting and formatting
+mypy src/ --ignore-missing-imports --exclude '.*/(venv|\.venv|node_modules|\.git|\.pytest_cache|\.mypy_cache|\.ruff_cache|__pycache__|build|dist|packaging|lambda_layer|cdk/lambda_layer|infra/lambda_layers)/.*'  # Type checking
+
+# Check git status before committing
+./scripts/check_git_status.sh
 
 # Run with coverage
 pytest --cov=src/ctrl_alt_heal --cov-report=html
-
-# Code quality checks
-flake8 src/ tests/
-black src/ tests/
-mypy src/
 ```
 
 ## 📚 **Documentation**

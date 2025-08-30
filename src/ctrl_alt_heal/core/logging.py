@@ -110,7 +110,7 @@ class StructuredLogger(LoggingService):
         }
 
         if details:
-            context["audit_details"] = details
+            context["audit_details"] = details  # type: ignore
 
         log_entry = self._format_log_entry("AUDIT", f"Audit: {action}", context)
         self.logger.info(log_entry)

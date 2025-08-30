@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-from datetime import datetime, timedelta
+from typing import Any, Dict, List, Tuple
+from datetime import datetime, timedelta, date
 from ics import Calendar, Event
 from ics.alarm import DisplayAlarm
 
@@ -136,7 +136,9 @@ def generate_medication_ics_tool(
     events_created = 0
 
     # First, collect all medications and their times to group them
-    time_medications = {}  # time_str -> list of (med, end_date) tuples
+    time_medications: Dict[
+        str, List[Tuple[Dict[str, Any], date]]
+    ] = {}  # time_str -> list of (med, end_date) tuples
 
     for med in scheduled_prescriptions:
         # Convert UTC times to user timezone for display

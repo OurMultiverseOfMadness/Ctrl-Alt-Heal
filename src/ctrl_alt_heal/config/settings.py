@@ -14,10 +14,23 @@ class Settings(BaseSettings):
     uploads_bucket_name: str = "test-uploads-bucket"
     telegram_secret_name: str = "test-telegram-secret"
 
+    # Telegram settings
+    telegram_bot_token: str = ""
+    telegram_bot_token_secret_arn: str = ""
+    telegram_api_url: str = "https://api.telegram.org"
+
+    # S3 settings
+    docs_bucket: str = ""
+
     class Config:
         env_file = ".env"
         # Allow reading from environment variables as a fallback
         env_file_encoding = "utf-8"
+
+    @classmethod
+    def load(cls) -> "Settings":
+        """Load settings from environment."""
+        return cls()
 
 
 settings = Settings()

@@ -382,7 +382,7 @@ def validate_request_data(data: Dict[str, Any], model_class: type) -> Dict[str, 
         sanitized_data = sanitize_input(data)
 
         # Validate using Pydantic model
-        validated_model = model_class(**sanitized_data)
+        validated_model = model_class(**sanitized_data)  # type: ignore
 
         # Return validated data as dict
         return validated_model.model_dump()

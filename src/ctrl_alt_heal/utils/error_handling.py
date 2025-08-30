@@ -160,7 +160,7 @@ def format_error_response(
             "error_type": error.__class__.__name__,
         }
         if include_details:
-            response["details"] = error.details
+            response["details"] = error.details  # type: ignore
     else:
         if user_friendly:
             message = "An unexpected error occurred. Please try again."

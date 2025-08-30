@@ -22,6 +22,7 @@ from ctrl_alt_heal.tools.registry import tool_registry
 from datetime import UTC, datetime
 import logging
 import uuid
+
 from strands import Agent
 from ctrl_alt_heal.config import settings
 from ctrl_alt_heal.utils.session_utils import (
@@ -196,7 +197,7 @@ def process_agent_response(
             send_telegram_message_with_retry(chat_id, final_message, max_retries=2)
             return
 
-        next_response = agent(tool_results=tool_results)
+        next_response = agent(tool_results=tool_results)  # type: ignore
         # Process the next response, which could be another tool call or a final message
         process_agent_response(next_response, agent, user, history, chat_id)
 
@@ -339,7 +340,7 @@ def handle_text_message(
     agent = get_agent(user, history)
 
     # Use agent() to execute tools directly
-    response_obj = agent()
+    response_obj = agent()  # type: ignore
 
     # Process the agent's response
     process_agent_response(response_obj, agent, user, history, chat_id)
@@ -402,7 +403,7 @@ def handle_photo_message(
 
     # Invoke the agent
     agent = get_agent(user, history)
-    agent_response_obj = agent()
+    agent_response_obj = agent()  # type: ignore
 
     # Process the agent's response
     process_agent_response(agent_response_obj, agent, user, history, chat_id)
@@ -479,7 +480,12 @@ def handler(event: dict[str, Any], _context: Any) -> None:
             logger.info(
                 "Continuing existing session - updating timestamp to keep it active"
             )
-            conversation_history = update_session_timestamp(conversation_history)
+            if conversation_history is not None:
+                conversation_history = update_session_timestamp(conversation_history)
+            else:
+                # If no history exists, create a new session
+                logger.info("No existing history found, creating new session")
+                conversation_history = create_new_session(user.user_id)
 
         # Save the session immediately to persist the changes
         history_store.save_history(conversation_history)

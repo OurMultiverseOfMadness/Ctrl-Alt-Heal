@@ -167,7 +167,7 @@ class TestTelegramAPIError:
         exc = TelegramAPIError("Message send failed", "chat123", 400)
         assert exc.message == "Message send failed"
         assert exc.details["chat_id"] == "chat123"
-        assert exc.details["error_code"] == 400
+        assert exc.details["error_code"] == "400"
 
 
 class TestBedrockError:
@@ -232,4 +232,4 @@ class TestNetworkError:
         exc = NetworkError("Connection failed", "https://api.telegram.org", 500)
         assert exc.message == "Connection failed"
         assert exc.details["url"] == "https://api.telegram.org"
-        assert exc.details["status_code"] == 500
+        assert exc.details["status_code"] == "500"

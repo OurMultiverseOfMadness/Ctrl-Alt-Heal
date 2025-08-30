@@ -13,6 +13,8 @@ def test_fhir_data_tool(mock_fhir_store):
 
     assert result == "sk-123"
     mock_fhir_store.assert_called_once()
+    # The function converts string user_id to int using hash
+    expected_user_id = hash("test-user-id") % (2**31)
     mock_fhir_store_instance.save_bundle.assert_called_once_with(
-        "test-user-id", {"bundle": "data"}
+        expected_user_id, {"bundle": "data"}
     )

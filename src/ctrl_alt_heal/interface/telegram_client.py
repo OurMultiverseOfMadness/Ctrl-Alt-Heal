@@ -103,8 +103,9 @@ class TelegramClient:
         current_time = time.time()
         time_since_last = current_time - self._last_request_time
 
-        if time_since_last < TELEGRAM_API["RATE_LIMIT_DELAY"]:
-            sleep_time = TELEGRAM_API["RATE_LIMIT_DELAY"] - time_since_last
+        rate_limit_delay = float(TELEGRAM_API["RATE_LIMIT_DELAY"])  # type: ignore[arg-type]
+        if time_since_last < rate_limit_delay:
+            sleep_time = rate_limit_delay - time_since_last
             time.sleep(sleep_time)
 
         self._last_request_time = time.time()
@@ -169,7 +170,7 @@ class TelegramClient:
         endpoint: str,
         data: Optional[Dict[str, Any]] = None,
         files: Optional[Dict[str, Any]] = None,
-        retries: int = TELEGRAM_API["MAX_RETRIES"],
+        retries: int = int(TELEGRAM_API["MAX_RETRIES"]),  # type: ignore[assignment,arg-type,call-overload]
     ) -> Dict[str, Any]:
         """
         Make a request to the Telegram API with retry logic.
@@ -193,21 +194,18 @@ class TelegramClient:
         for attempt in range(retries + 1):
             try:
                 self._rate_limit_delay()
+                timeout = float(TELEGRAM_API["TIMEOUT"])  # type: ignore
 
                 if method.upper() == "GET":
-                    response = requests.get(
-                        url, params=data, timeout=TELEGRAM_API["TIMEOUT"]
-                    )
+                    response = requests.get(url, params=data, timeout=timeout)
                 else:
                     # Use data parameter when files are present, json otherwise
                     if files:
                         response = requests.post(
-                            url, data=data, files=files, timeout=TELEGRAM_API["TIMEOUT"]
+                            url, data=data, files=files, timeout=timeout
                         )
                     else:
-                        response = requests.post(
-                            url, json=data, timeout=TELEGRAM_API["TIMEOUT"]
-                        )
+                        response = requests.post(url, json=data, timeout=timeout)
 
                 return self._handle_response(response)
 
@@ -285,9 +283,8 @@ class TelegramClient:
                     **message_data,
                 }
 
-                result = self._make_request(
-                    "POST", TELEGRAM_API["SEND_MESSAGE_ENDPOINT"], payload
-                )
+                endpoint: str = str(TELEGRAM_API["SEND_MESSAGE_ENDPOINT"])
+                result = self._make_request("POST", endpoint, payload)
                 sent_messages.append(result)
 
                 logger.info(f"Message sent to chat {chat_id}")
@@ -329,19 +326,19 @@ class TelegramClient:
         """
         try:
             # Truncate caption if too long
-            if len(caption) > TELEGRAM_API["MAX_CAPTION_LENGTH"]:
+            max_caption_length: int = int(TELEGRAM_API["MAX_CAPTION_LENGTH"])  # type: ignore
+            if len(caption) > max_caption_length:
                 logger.info(
                     f"Caption truncated from {len(caption)} to {TELEGRAM_API['MAX_CAPTION_LENGTH']} characters"
                 )
-                caption = caption[: TELEGRAM_API["MAX_CAPTION_LENGTH"] - 3] + "..."
+                caption = caption[: max_caption_length - 3] + "..."
 
             # Prepare file data
             files = {"document": (filename, file_content, mime_type)}
             data = {"chat_id": chat_id, "caption": caption}
 
-            result = self._make_request(
-                "POST", TELEGRAM_API["SEND_FILE_ENDPOINT"], data, files
-            )
+            endpoint: str = str(TELEGRAM_API["SEND_FILE_ENDPOINT"])
+            result = self._make_request("POST", endpoint, data, files)
 
             logger.info(f"File sent to chat {chat_id}: {filename}")
             return result
@@ -367,7 +364,8 @@ class TelegramClient:
         """
         try:
             data = {"file_id": file_id}
-            result = self._make_request("GET", TELEGRAM_API["GET_FILE_ENDPOINT"], data)
+            endpoint: str = str(TELEGRAM_API["GET_FILE_ENDPOINT"])
+            result = self._make_request("GET", endpoint, data)
 
             file_path = result.get("file_path")
             if file_path:
@@ -399,7 +397,8 @@ class TelegramClient:
             url = f"https://api.telegram.org/file/bot{token}/{file_path}"
 
             self._rate_limit_delay()
-            response = requests.get(url, timeout=TELEGRAM_API["TIMEOUT"])
+            timeout = float(TELEGRAM_API["TIMEOUT"])  # type: ignore
+            response = requests.get(url, timeout=timeout)
             response.raise_for_status()
 
             logger.info(f"File downloaded: {file_path}")

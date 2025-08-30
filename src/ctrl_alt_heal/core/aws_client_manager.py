@@ -82,7 +82,7 @@ class CircuitBreaker:
             if self.state == CircuitState.CLOSED:
                 return True
             elif self.state == CircuitState.OPEN:
-                if time.time() - self.last_failure_time > self.config.recovery_timeout:
+                if time.time() - self.last_failure_time > self.config.recovery_timeout:  # type: ignore
                     self.state = CircuitState.HALF_OPEN
                     return True
                 return False
@@ -225,7 +225,11 @@ class AWSClientManager:
 
     def get_service_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all AWS services."""
-        status = {"region": self.region_name, "services": {}, "overall_health": True}
+        status: Dict[str, Any] = {
+            "region": self.region_name,
+            "services": {},
+            "overall_health": True,
+        }
 
         for service_name in AWS_SERVICES.values():
             circuit_status = self._circuit_breakers[service_name].get_status()
@@ -242,7 +246,7 @@ class AWSClientManager:
                 else None,
             }
 
-            status["services"][service_name] = service_status
+            status["services"][service_name] = service_status  # type: ignore
 
             if not service_status["health"]:
                 status["overall_health"] = False

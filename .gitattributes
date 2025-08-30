@@ -1,0 +1,161 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text diff=python
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Configuration files
+*.json text
+*.yaml text
+*.yml text
+*.toml text
+*.ini text
+*.cfg text
+*.conf text
+
+# Documentation
+*.md text diff=markdown
+*.txt text
+*.rst text
+
+# Docker files
+Dockerfile text
+*.dockerfile text
+
+# AWS CDK files
+cdk.json text
+cdk.context.json text
+
+# Requirements files
+requirements*.txt text
+
+# Git files
+.gitignore text
+.gitattributes text
+
+# Binary files (should not be modified)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.tar.bz2 binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Archives
+*.7z binary
+*.rar binary
+*.tar binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# Audio/Video
+*.mp3 binary
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.wav binary
+*.flac binary
+
+# Executables
+*.exe binary
+*.msi binary
+*.deb binary
+*.rpm binary
+*.dmg binary
+*.pkg binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Certificate files
+*.pem text
+*.crt text
+*.key text
+*.p12 binary
+*.pfx binary
+
+# Log files (should not be tracked)
+*.log text eol=lf
+
+# Temporary files (should not be tracked)
+*.tmp text
+*.temp text
+*.bak text
+*.backup text
+*.orig text
+*.rej text
+
+# IDE and editor files (should not be tracked)
+.vscode/ export-ignore
+.idea/ export-ignore
+*.sublime-* export-ignore
+.atom/ export-ignore
+.brackets.json export-ignore
+
+# OS generated files (should not be tracked)
+.DS_Store export-ignore
+.DS_Store? export-ignore
+._* export-ignore
+.Spotlight-V100 export-ignore
+.Trashes export-ignore
+ehthumbs.db export-ignore
+Thumbs.db export-ignore
+
+# Virtual environments (should not be tracked)
+venv/ export-ignore
+.venv/ export-ignore
+env/ export-ignore
+ENV/ export-ignore
+env.bak/ export-ignore
+venv.bak/ export-ignore
+
+# Build artifacts (should not be tracked)
+build/ export-ignore
+dist/ export-ignore
+*.egg-info/ export-ignore
+.cdk.staging/ export-ignore
+cdk.out/ export-ignore
+packaging/ export-ignore
+
+# Cache directories (should not be tracked)
+.cache/ export-ignore
+cache/ export-ignore
+.pytest_cache/ export-ignore
+.mypy_cache/ export-ignore
+.ruff_cache/ export-ignore
+__pycache__/ export-ignore
+
+# Test artifacts (should not be tracked)
+test_results/ export-ignore
+test_output/ export-ignore
+coverage_html/ export-ignore
+htmlcov/ export-ignore
+.coverage export-ignore
+
+# Secrets and sensitive data (should not be tracked)
+*.env export-ignore
+secrets/ export-ignore
+credentials/ export-ignore
+client_secret.json export-ignore
+
+# Lambda layers (should not be tracked)
+lambda_layer/ export-ignore
+cdk/lambda_layer/ export-ignore
+infra/lambda_layers/ export-ignore

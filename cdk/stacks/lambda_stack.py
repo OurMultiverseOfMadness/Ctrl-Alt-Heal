@@ -27,13 +27,13 @@ class LambdaStack(Stack):
 
         self.env_name = environment
 
-        # Lambda Layer
-        layer = _lambda.LayerVersion(
+        # Lambda Layer for dependencies (following official strands-agents approach)
+        dependencies_layer = _lambda.LayerVersion(
             self,
-            "LambdaLayer",
-            code=_lambda.Code.from_asset("lambda_layer"),
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_11],
-            description="A layer for Python dependencies",
+            "DependenciesLayerV2",
+            code=_lambda.Code.from_asset("../packaging/dependencies.zip"),
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
+            description="Dependencies needed for agent-based lambda",
         )
 
         # IAM Role for the Worker Lambda
@@ -89,17 +89,36 @@ class LambdaStack(Stack):
 
         # Grant SQS permissions to the worker role
         sqs_stack.messages_queue.grant_consume_messages(worker_role)
+        # Grant SQS send permissions for the webhook handler
+        sqs_stack.messages_queue.grant_send_messages(worker_role)
 
-        # Agent Worker Lambda Function
+        # Webhook Handler Lambda Function (for Telegram webhook)
+        self.webhook_function = _lambda.Function(
+            self,
+            "WebhookHandler",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            architecture=_lambda.Architecture.ARM_64,
+            handler="ctrl_alt_heal.main.handler",
+            code=_lambda.Code.from_asset("../packaging/app.zip"),
+            role=worker_role,  # Reuse the same role
+            layers=[dependencies_layer],
+            environment={
+                "MESSAGES_QUEUE_URL": sqs_stack.messages_queue.queue_url,
+                "ENVIRONMENT": environment,
+            },
+            timeout=cdk.Duration.seconds(30),
+        )
+
+        # Agent Worker Lambda Function (following official strands-agents approach)
         self.worker_function = _lambda.Function(
             self,
             "Worker",
-            runtime=_lambda.Runtime.PYTHON_3_11,
+            runtime=_lambda.Runtime.PYTHON_3_12,
             architecture=_lambda.Architecture.ARM_64,
             handler="ctrl_alt_heal.worker.handler",
-            code=_lambda.Code.from_asset("../src"),
+            code=_lambda.Code.from_asset("../packaging/app.zip"),
             role=worker_role,
-            layers=[layer],
+            layers=[dependencies_layer],
             environment={
                 "USERS_TABLE_NAME": database_stack.users_table.table_name,
                 "IDENTITIES_TABLE_NAME": database_stack.identities_table.table_name,
@@ -111,7 +130,15 @@ class LambdaStack(Stack):
                 "SERPER_SECRET_NAME": f"ctrl-alt-heal/{environment}/serper/api-key",
                 "TELEGRAM_SECRET_NAME": f"ctrl-alt-heal/{environment}/telegram/bot-token",
                 "ENVIRONMENT": environment,
-                "AGENT_VERSION": "3.2",  # Force a redeployment
+                "AGENT_VERSION": "3.6",  # Force a redeployment
+                # Disable OpenTelemetry telemetry collection to prevent Lambda compatibility issues
+                "OTEL_TRACES_SAMPLER": "off",
+                "OTEL_METRICS_EXPORTER": "none",
+                "OTEL_LOGS_EXPORTER": "none",
+                "OTEL_PYTHON_DISABLED": "true",
+                "OTEL_PYTHON_TRACER_PROVIDER": "none",
+                "OTEL_PYTHON_METER_PROVIDER": "none",
+                "OTEL_PYTHON_LOGGER_PROVIDER": "none",
             },
             timeout=cdk.Duration.seconds(240),
         )

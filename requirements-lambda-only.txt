@@ -6,7 +6,7 @@ pydantic>=2.11.0
 pydantic-settings>=2.10.0
 
 # AI/ML dependencies (these are the heavy ones)
-strands-agents>=1.4.0
+strands-agents>=1.6.0
 strands-agents-tools>=0.2.5
 
 # HTTP and networking (requests is not in Lambda runtime)

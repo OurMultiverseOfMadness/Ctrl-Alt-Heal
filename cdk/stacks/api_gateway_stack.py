@@ -26,7 +26,7 @@ class ApiGatewayStack(Stack):
         api = apigw.LambdaRestApi(
             self,
             "Api",
-            handler=lambda_stack.worker_function,
+            handler=lambda_stack.webhook_function,
             proxy=False,
             deploy_options=apigw.StageOptions(
                 access_log_destination=apigw.LogGroupLogDestination(log_group),
@@ -45,8 +45,8 @@ class ApiGatewayStack(Stack):
             cloud_watch_role=True,
         )
 
-        # Create the Lambda integration
-        webhook_integration = apigw.LambdaIntegration(lambda_stack.worker_function)
+        # Create the Lambda integration for webhook handler
+        webhook_integration = apigw.LambdaIntegration(lambda_stack.webhook_function)
 
         items = api.root.add_resource("webhook")
         items.add_method("POST", webhook_integration, api_key_required=False)

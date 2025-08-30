@@ -1,0 +1,1 @@
+{"errorMessage": "'Records'", "errorType": "KeyError", "requestId": "ef29af65-42a0-4440-b09f-87d6f7433c03", "stackTrace": ["  File \"/var/task/ctrl_alt_heal/worker.py\", line 415, in handler\n    for record in event[\"Records\"]:\n"]}

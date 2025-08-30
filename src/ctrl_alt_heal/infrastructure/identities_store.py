@@ -23,7 +23,7 @@ class IdentitiesStore:
         """Finds an internal user_id based on an external identity."""
         try:
             composite_key = f"{provider}#{provider_user_id}"
-            response = self.table.get_item(Key={"pk": composite_key})
+            response = self.table.get_item(Key={"identity_key": composite_key})
             if "Item" in response:
                 return response["Item"]["user_id"]
             return None
@@ -39,4 +39,11 @@ class IdentitiesStore:
         identity.created_at = datetime.now(UTC).isoformat()
         if not identity.pk:
             identity.pk = f"{identity.provider}#{identity.provider_user_id}"
-        self.table.put_item(Item=identity.model_dump())
+
+        # Convert the Identity model to a dict and use the correct key name
+        item = identity.model_dump()
+        # Replace 'pk' with 'identity_key' to match the table schema
+        if "pk" in item:
+            item["identity_key"] = item.pop("pk")
+
+        self.table.put_item(Item=item)

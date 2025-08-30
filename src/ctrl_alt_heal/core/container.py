@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Type, TypeVar, Optional
+from typing import Any, Dict, Type, TypeVar, Optional, Callable
 from functools import wraps
 import logging
 
@@ -17,7 +17,7 @@ class Container:
     def __init__(self):
         self._services: Dict[str, Any] = {}
         self._singletons: Dict[str, Any] = {}
-        self._factories: Dict[str, callable] = {}
+        self._factories: Dict[str, Callable[[], Any]] = {}
 
     def register(self, service_type: Type[T], implementation: T) -> None:
         """
@@ -43,7 +43,7 @@ class Container:
         self._singletons[service_name] = implementation
         logger.debug(f"Registered singleton: {service_name}")
 
-    def register_factory(self, service_type: Type[T], factory: callable) -> None:
+    def register_factory(self, service_type: Type[T], factory: Callable[[], T]) -> None:
         """
         Register a factory function for creating service instances.
 
@@ -136,7 +136,7 @@ def get_container() -> Container:
     return _container
 
 
-def inject(service_type: Type[T]) -> T:
+def inject(service_type: Type[T]) -> Callable:
     """
     Decorator to inject dependencies into functions.
 
@@ -159,7 +159,7 @@ def inject(service_type: Type[T]) -> T:
     return decorator
 
 
-def inject_optional(service_type: Type[T]) -> Optional[T]:
+def inject_optional(service_type: Type[T]) -> Callable:
     """
     Decorator to inject optional dependencies into functions.
 

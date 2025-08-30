@@ -242,7 +242,8 @@ class TelegramFormatter:
         """
         try:
             formatted = self._apply_formatting(text)
-            return len(formatted) <= TELEGRAM_API["MAX_MESSAGE_LENGTH"]
+            max_length: int = int(TELEGRAM_API["MAX_MESSAGE_LENGTH"])  # type: ignore
+            return len(formatted) <= max_length
         except Exception:
             return False
 
@@ -263,7 +264,7 @@ class TelegramFormatter:
 class MessageSplitter:
     """Handles intelligent message splitting for Telegram."""
 
-    def __init__(self, max_length: int = TELEGRAM_API["MAX_MESSAGE_LENGTH"]):
+    def __init__(self, max_length: int = int(TELEGRAM_API["MAX_MESSAGE_LENGTH"])):  # type: ignore
         """
         Initialize the splitter.
 

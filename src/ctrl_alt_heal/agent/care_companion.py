@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 import boto3
 from functools import lru_cache
 
@@ -461,7 +461,7 @@ def get_agent(
     agent = Agent(
         model=bedrock_model,
         system_prompt=system_prompt,
-        messages=messages,
+        messages=messages,  # type: ignore
         tools=[
             describe_image_tool,
             prescription_extraction_tool,
