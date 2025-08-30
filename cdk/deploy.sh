@@ -175,14 +175,42 @@ cdk deploy --all --require-approval never $AWS_PROFILE_ARG
 echo ""
 echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
 echo ""
+
+# Get and display the webhook URL
+echo -e "${BLUE}🔗 Getting Telegram webhook URL...${NC}"
+WEBHOOK_BASE_URL=""
+if [[ -n "$AWS_PROFILE" ]]; then
+    WEBHOOK_BASE_URL=$(aws cloudformation describe-stacks --stack-name ${PROJECT_NAME}ApiGatewayStack --profile $AWS_PROFILE --query 'Stacks[0].Outputs[?OutputKey==`ApiEndpoint4F160690`].OutputValue' --output text 2>/dev/null)
+else
+    WEBHOOK_BASE_URL=$(aws cloudformation describe-stacks --stack-name ${PROJECT_NAME}ApiGatewayStack --query 'Stacks[0].Outputs[?OutputKey==`ApiEndpoint4F160690`].OutputValue' --output text 2>/dev/null)
+fi
+
+if [[ -n "$WEBHOOK_BASE_URL" ]]; then
+    WEBHOOK_URL="${WEBHOOK_BASE_URL}webhook"
+    echo ""
+    echo -e "${GREEN}🎯 Telegram Webhook Handler URL:${NC}"
+    echo -e "${YELLOW}${WEBHOOK_URL}${NC}"
+    echo ""
+    echo -e "${BLUE}📋 Quick setup commands:${NC}"
+    echo -e "export WEBHOOK_URL=\"${WEBHOOK_URL}\""
+    echo -e "export TELEGRAM_BOT_TOKEN=\"your_bot_token\""
+    echo -e "export TELEGRAM_WEBHOOK_SECRET=\"your_webhook_secret\""
+    echo -e "cd .. && python scripts/set_telegram_webhook.py"
+    echo ""
+else
+    echo -e "${YELLOW}⚠️  Could not retrieve webhook URL automatically${NC}"
+    echo -e "${BLUE}📋 Manual steps:${NC}"
+    echo -e "1. Get the API Gateway URL from CDK output"
+    echo -e "2. Add '/webhook' to the end for the complete webhook URL"
+fi
+
+echo ""
 echo -e "${BLUE}📋 Next steps:${NC}"
 echo -e "1. Update secrets in AWS Secrets Manager:"
 echo -e "   - ${YELLOW}ctrl-alt-heal/${ENVIRONMENT}/serper/api-key${NC}"
 echo -e "   - ${YELLOW}ctrl-alt-heal/${ENVIRONMENT}/telegram/bot-token${NC}"
 echo ""
-echo -e "2. Set Telegram webhook:"
-echo -e "   - Get the API Gateway URL from the CDK output"
-echo -e "   - Run: ${YELLOW}python scripts/set_telegram_webhook.py${NC}"
+echo -e "2. Set Telegram webhook using the URL above"
 echo ""
 echo -e "3. Test the deployment:"
 echo -e "   - Send a message to your Telegram bot"
