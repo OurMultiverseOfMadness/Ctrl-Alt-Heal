@@ -1,0 +1,19 @@
+# Ultra-minimal requirements - only absolutely essential packages
+# Excluding heavy dependencies that might not be needed
+
+# Pydantic and configuration
+pydantic>=2.11.0
+pydantic-settings>=2.10.0
+
+# HTTP and networking
+requests>=2.31.0
+
+# Environment and utilities
+python-dotenv>=1.1.0
+pytz>=2023.3
+
+# Utilities
+werkzeug>=3.0.0
+
+# Note: strands-agents and strands-agents-tools are excluded due to size
+# These will need to be handled differently or included in the function code

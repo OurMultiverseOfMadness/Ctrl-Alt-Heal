@@ -19,7 +19,7 @@ class ApiGatewayStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        self.environment = environment
+        self.env_name = environment
 
         log_group = logs.LogGroup(self, "ApiAccessLogs")
 

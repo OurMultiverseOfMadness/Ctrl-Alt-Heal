@@ -5,9 +5,9 @@ FROM --platform=linux/arm64 public.ecr.aws/lambda/python:3.12 as builder
 WORKDIR /var/task
 
 # Copy requirements file and install dependencies
-COPY requirements.txt .
+COPY requirements-strands-only.txt .
 RUN python3.12 -m pip install --upgrade pip
-RUN python3.12 -m pip install -r requirements.txt -t /asset-output/python
+RUN python3.12 -m pip install -r requirements-strands-only.txt -t /asset-output/python
 
 # Clean up unnecessary packages and optimize size
 RUN rm -rf /asset-output/python/boto3*
@@ -15,6 +15,9 @@ RUN rm -rf /asset-output/python/botocore*
 RUN rm -rf /asset-output/python/*.dist-info
 RUN rm -rf /asset-output/python/*.pyc
 RUN rm -rf /asset-output/python/__pycache__
+RUN rm -rf /asset-output/python/tests*
+RUN rm -rf /asset-output/python/test*
+RUN rm -rf /asset-output/python/*.so
 
 # Stage 2: Final stage with the clean AWS Lambda base image
 FROM public.ecr.aws/lambda/python:3.12

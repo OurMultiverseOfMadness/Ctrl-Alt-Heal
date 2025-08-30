@@ -14,8 +14,8 @@ class DatabaseStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        self.environment = environment
-        self.table_prefix = f"ctrl_alt_heal_{environment}"
+        self.env_name = environment
+        self.table_prefix = f"ctrl-alt-heal-{environment}"
 
         # S3 bucket for storing user uploads
         self.uploads_bucket = s3.Bucket(
@@ -104,6 +104,8 @@ class DatabaseStack(Stack):
             sort_key=sk,
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=cdk.RemovalPolicy.DESTROY,  # Change for production
-            point_in_time_recovery=True,  # Enable PITR for data protection
-            contributor_insights=True,  # Enable contributor insights for monitoring
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True
+            ),  # Enable PITR for data protection
+            contributor_insights_enabled=True,  # Enable contributor insights for monitoring
         )

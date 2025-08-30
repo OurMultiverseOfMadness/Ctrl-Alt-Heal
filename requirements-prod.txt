@@ -23,12 +23,6 @@ httpcore>=1.0.0
 python-dotenv>=1.1.0
 pytz>=2023.3
 
-# Caching and performance (optional - only if Redis is configured)
-# redis>=5.0.0
-
-# System monitoring (optional - only if psutil is available)
-# psutil>=5.9.0
-
 # Web framework
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
@@ -37,20 +31,6 @@ httptools>=0.6.0
 
 # Data processing
 numpy>=1.24.0
-
-# Development and testing
-pytest>=7.4.0
-pytest-cov>=4.1.0
-pytest-mock>=3.11.0
-Faker>=20.0.0
-freezegun>=1.2.0
-moto>=4.2.0
-ruff>=0.1.0
-coverage>=7.3.0
-
-# AWS CDK
-aws-cdk-lib>=2.100.0
-constructs>=10.3.0
 
 # Utilities
 werkzeug>=3.0.0

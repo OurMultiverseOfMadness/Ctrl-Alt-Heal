@@ -10,7 +10,7 @@ class SecretsStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        self.environment = environment
+        self.env_name = environment
         self.secret_prefix = f"ctrl-alt-heal/{environment}"
 
         # Create Serper API Secret

@@ -25,7 +25,7 @@ class LambdaStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        self.environment = environment
+        self.env_name = environment
 
         # Lambda Layer
         layer = _lambda.LayerVersion(

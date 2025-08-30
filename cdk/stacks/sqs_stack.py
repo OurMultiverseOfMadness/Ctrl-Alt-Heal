@@ -12,7 +12,7 @@ class SqsStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        self.environment = environment
+        self.env_name = environment
 
         self.messages_queue = sqs.Queue(
             self,

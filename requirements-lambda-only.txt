@@ -1,0 +1,20 @@
+# Only packages NOT available in Lambda runtime
+# boto3, botocore, urllib3, etc. are already available
+
+# Pydantic and configuration
+pydantic>=2.11.0
+pydantic-settings>=2.10.0
+
+# AI/ML dependencies (these are the heavy ones)
+strands-agents>=1.4.0
+strands-agents-tools>=0.2.5
+
+# HTTP and networking (requests is not in Lambda runtime)
+requests>=2.31.0
+
+# Environment and utilities
+python-dotenv>=1.1.0
+pytz>=2023.3
+
+# Utilities
+werkzeug>=3.0.0

@@ -1,0 +1,21 @@
+# Core AWS dependencies (these are already available in Lambda runtime)
+# boto3>=1.40.0  # Already available in Lambda
+# botocore>=1.40.0  # Already available in Lambda
+
+# Pydantic and configuration
+pydantic>=2.11.0
+pydantic-settings>=2.10.0
+
+# AI/ML dependencies (these are the heavy ones)
+strands-agents>=1.4.0
+strands-agents-tools>=0.2.5
+
+# HTTP and networking
+requests>=2.31.0
+
+# Environment and utilities
+python-dotenv>=1.1.0
+pytz>=2023.3
+
+# Utilities
+werkzeug>=3.0.0
