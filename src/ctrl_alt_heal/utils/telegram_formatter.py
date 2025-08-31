@@ -97,8 +97,8 @@ class TelegramFormatter:
         # Links: [text](url) -> <a href="url">text</a>
         text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
 
-        # Line breaks: \n -> <br>
-        text = text.replace("\n", "<br>")
+        # Line breaks: \n -> \n (keep as is for HTML mode)
+        # Telegram HTML mode handles \n naturally, no need for <br> tags
 
         return text
 
