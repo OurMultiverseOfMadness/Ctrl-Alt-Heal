@@ -33,11 +33,11 @@ class PrescriptionsStore:
         if self._table is None:
             raise RuntimeError("PRESCRIPTIONS_TABLE_NAME not configured")
         ts = datetime.now(UTC).isoformat()
-        sk = f"PRESCRIPTION#{uuid.uuid4()}"
+        prescription_id = f"PRESCRIPTION#{uuid.uuid4()}"
         self._table.put_item(
             Item={
-                "pk": f"USER#{user_id}",
-                "sk": sk,
+                "user_id": user_id,
+                "prescription_id": prescription_id,
                 "name": name,
                 "dosageText": dosage_text,
                 "frequencyText": frequency_text,
@@ -48,7 +48,7 @@ class PrescriptionsStore:
                 "updatedAt": ts,
             }
         )
-        return sk
+        return prescription_id
 
     def list_prescriptions_page(
         self,
@@ -61,8 +61,8 @@ class PrescriptionsStore:
         self._ensure_table()
         assert self._table is not None
         kwargs: dict[str, Any] = {
-            "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(
-                f"USER#{user_id}"
+            "KeyConditionExpression": boto3.dynamodb.conditions.Key("user_id").eq(
+                user_id
             ),
             "Limit": limit,
         }
@@ -86,40 +86,50 @@ class PrescriptionsStore:
         )
         return items
 
-    def update_prescription_status(self, user_id: str, sk: str, status: str) -> None:
+    def update_prescription_status(
+        self, user_id: str, prescription_id: str, status: str
+    ) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"USER#{user_id}", "sk": sk},
+            Key={"user_id": user_id, "prescription_id": prescription_id},
             UpdateExpression="SET #s = :s",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":s": status},
         )
 
-    def get_prescription(self, user_id: str, sk: str) -> dict[str, Any] | None:
+    def get_prescription(
+        self, user_id: str, prescription_id: str
+    ) -> dict[str, Any] | None:
         self._ensure_table()
         assert self._table is not None
-        resp = self._table.get_item(Key={"pk": f"USER#{user_id}", "sk": sk})
+        resp = self._table.get_item(
+            Key={"user_id": user_id, "prescription_id": prescription_id}
+        )
         item = resp.get("Item") if isinstance(resp, dict) else None
         return item if isinstance(item, dict) else None
 
     def set_prescription_schedule(
-        self, user_id: str, sk: str, times_utc_hhmm: list[str], until_iso: str
+        self,
+        user_id: str,
+        prescription_id: str,
+        times_utc_hhmm: list[str],
+        until_iso: str,
     ) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"USER#{user_id}", "sk": sk},
+            Key={"user_id": user_id, "prescription_id": prescription_id},
             UpdateExpression="SET #t = :t, #u = :u",
             ExpressionAttributeNames={"#t": "scheduleTimes", "#u": "scheduleUntil"},
             ExpressionAttributeValues={":t": times_utc_hhmm, ":u": until_iso},
         )
 
     def update_prescription_source_bundle(
-        self, user_id: str, sk: str, source_bundle_sk: str
+        self, user_id: str, prescription_id: str, source_bundle_sk: str
     ) -> None:
         """Updates the sourceBundleSK field for a prescription to link it to a FHIR bundle."""
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"USER#{user_id}", "sk": sk},
+            Key={"user_id": user_id, "prescription_id": prescription_id},
             UpdateExpression="SET sourceBundleSK = :bundle_sk, updatedAt = :updated_at",
             ExpressionAttributeValues={
                 ":bundle_sk": source_bundle_sk,
@@ -128,20 +138,20 @@ class PrescriptionsStore:
         )
 
     def set_prescription_schedule_names(
-        self, user_id: str, sk: str, schedule_names: list[str]
+        self, user_id: str, prescription_id: str, schedule_names: list[str]
     ) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"USER#{user_id}", "sk": sk},
+            Key={"user_id": user_id, "prescription_id": prescription_id},
             UpdateExpression="SET #n = :n",
             ExpressionAttributeNames={"#n": "scheduleNames"},
             ExpressionAttributeValues={":n": schedule_names},
         )
 
-    def clear_prescription_schedule(self, user_id: str, sk: str) -> None:
+    def clear_prescription_schedule(self, user_id: str, prescription_id: str) -> None:
         self._ensure_table()
         self._table.update_item(  # type: ignore[union-attr]
-            Key={"pk": f"USER#{user_id}", "sk": sk},
+            Key={"user_id": user_id, "prescription_id": prescription_id},
             UpdateExpression=("REMOVE #t, #u, #n"),
             ExpressionAttributeNames={
                 "#t": "scheduleTimes",

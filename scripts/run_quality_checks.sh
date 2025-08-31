@@ -90,7 +90,7 @@ sys.path.insert(0, os.path.join(os.getcwd(), 'src'))
 
 # Test critical imports
 try:
-    import ctrl_alt_heal.worker
+    import ctrl_alt_heal.fargate_app
     import ctrl_alt_heal.agent.care_companion
     import ctrl_alt_heal.infrastructure.identities_store
     import ctrl_alt_heal.infrastructure.users_store

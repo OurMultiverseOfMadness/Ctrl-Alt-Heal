@@ -170,7 +170,7 @@ class TelegramClient:
         endpoint: str,
         data: Optional[Dict[str, Any]] = None,
         files: Optional[Dict[str, Any]] = None,
-        retries: int = int(TELEGRAM_API["MAX_RETRIES"]),  # type: ignore[assignment,arg-type,call-overload]
+        retries: int = int(TELEGRAM_API["MAX_RETRIES"]),  # type: ignore[arg-type]
     ) -> Dict[str, Any]:
         """
         Make a request to the Telegram API with retry logic.

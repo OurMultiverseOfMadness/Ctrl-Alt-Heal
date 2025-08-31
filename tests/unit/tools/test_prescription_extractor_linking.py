@@ -78,7 +78,7 @@ def test_extract_prescription_links_fhir_bundle_to_prescription(
 
     # Verify the prescription was linked to the FHIR bundle
     mock_prescriptions_store.update_prescription_source_bundle.assert_called_once_with(
-        user_id=user_id, sk=prescription_sk, source_bundle_sk=bundle_sk
+        user_id=user_id, prescription_id=prescription_sk, source_bundle_sk=bundle_sk
     )
 
 
@@ -151,12 +151,12 @@ def test_extract_prescription_links_multiple_prescriptions(
 
     # First prescription linking
     assert linking_calls[0][1]["user_id"] == user_id
-    assert linking_calls[0][1]["sk"] == prescription_sks[0]
+    assert linking_calls[0][1]["prescription_id"] == prescription_sks[0]
     assert linking_calls[0][1]["source_bundle_sk"] == bundle_sks[0]
 
     # Second prescription linking
     assert linking_calls[1][1]["user_id"] == user_id
-    assert linking_calls[1][1]["sk"] == prescription_sks[1]
+    assert linking_calls[1][1]["prescription_id"] == prescription_sks[1]
     assert linking_calls[1][1]["source_bundle_sk"] == bundle_sks[1]
 
 

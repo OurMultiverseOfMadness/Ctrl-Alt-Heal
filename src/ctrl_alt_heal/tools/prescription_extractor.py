@@ -60,7 +60,9 @@ def extract_prescription(
 
             # Link the prescription to the FHIR bundle by updating the sourceBundleSK
             prescriptions_store.update_prescription_source_bundle(
-                user_id=user_id, sk=prescription_sk, source_bundle_sk=bundle_sk
+                user_id=user_id,
+                prescription_id=prescription_sk,
+                source_bundle_sk=bundle_sk,
             )
 
     return result

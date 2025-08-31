@@ -2,11 +2,10 @@
 import os
 import aws_cdk as cdk
 
-from stacks.api_gateway_stack import ApiGatewayStack
 from stacks.database_stack import DatabaseStack
-from stacks.lambda_stack import LambdaStack
+from stacks.fargate_stack import FargateStack
 from stacks.secrets_stack import SecretsStack
-from stacks.sqs_stack import SqsStack
+from stacks.api_gateway_stack import ApiGatewayStack
 
 app = cdk.App()
 
@@ -18,8 +17,8 @@ aws_region = os.environ.get("CDK_DEFAULT_REGION", "ap-southeast-1")
 aws_env = cdk.Environment(account=aws_account, region=aws_region)
 
 # Get stack configuration
-environment = os.environ.get("ENVIRONMENT", "dev")
-project_name = os.environ.get("PROJECT_NAME", "CtrlAltHeal")
+environment = os.environ.get("ENVIRONMENT", "production")
+project_name = os.environ.get("PROJECT_NAME", "Cara-Agents")
 
 # Create the database stack
 database_stack = DatabaseStack(
@@ -37,32 +36,27 @@ secrets_stack = SecretsStack(
     environment=environment,
 )
 
-# Create the SQS stack
-sqs_stack = SqsStack(
+# Create the Fargate stack, passing the database and secrets stacks
+fargate_stack = FargateStack(
     app,
-    f"{project_name}SqsStack",
-    env=aws_env,
-    environment=environment,
-)
-
-# Create the Lambda stack, passing the database, secrets, and SQS stacks
-lambda_stack = LambdaStack(
-    app,
-    f"{project_name}LambdaStack",
+    f"{project_name}FargateStack",
     database_stack=database_stack,
     secrets_stack=secrets_stack,
-    sqs_stack=sqs_stack,
     env=aws_env,
     environment=environment,
 )
 
-# Create the API Gateway stack, passing the Lambda stack
+# Create the API Gateway stack, passing the VPC and ALB from Fargate stack
 api_gateway_stack = ApiGatewayStack(
     app,
     f"{project_name}ApiGatewayStack",
-    lambda_stack=lambda_stack,
+    vpc=fargate_stack.vpc,
+    alb=fargate_stack.alb,
     env=aws_env,
     environment=environment,
 )
+
+# Add dependency to ensure Fargate stack is deployed before API Gateway
+api_gateway_stack.add_dependency(fargate_stack)
 
 app.synth()

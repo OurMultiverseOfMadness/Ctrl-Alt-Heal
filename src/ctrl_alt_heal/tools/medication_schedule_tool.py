@@ -214,10 +214,10 @@ def set_medication_schedule_tool(
     until_iso = end_date.isoformat()
 
     # Set the schedule
-    prescription_sk = matching_prescription["sk"]
+    prescription_id = matching_prescription["prescription_id"]
     prescriptions_store.set_prescription_schedule(
         user_id=user_id,
-        sk=prescription_sk,
+        prescription_id=prescription_id,
         times_utc_hhmm=utc_times,
         until_iso=until_iso,
     )
@@ -441,8 +441,8 @@ def clear_medication_schedule_tool(
             }
 
     # Clear the schedule
-    prescription_sk = matching_prescription["sk"]
-    prescriptions_store.clear_prescription_schedule(user_id, prescription_sk)
+    prescription_id = matching_prescription["prescription_id"]
+    prescriptions_store.clear_prescription_schedule(user_id, prescription_id)
 
     return {
         "status": "success",

@@ -25,14 +25,14 @@ class FhirStore:
         self._ensure_table()
         assert self._table is not None
         ts = datetime.now(UTC).isoformat()
-        sk = f"BUNDLE#{uuid.uuid4()}"
+        resource_id = f"BUNDLE#{uuid.uuid4()}"
         self._table.put_item(
             Item={
-                "pk": f"USER#{user_id}",
-                "sk": sk,
+                "user_id": user_id,
+                "resource_id": resource_id,
                 "bundle": bundle,
                 "createdAt": ts,
                 "updatedAt": ts,
             }
         )
-        return sk
+        return resource_id

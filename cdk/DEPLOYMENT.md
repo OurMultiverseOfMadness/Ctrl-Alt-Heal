@@ -15,19 +15,18 @@ This guide provides step-by-step instructions for deploying Ctrl-Alt-Heal to a n
 ### **One-Command Deployment**
 
 ```bash
-# Navigate to CDK directory
-cd cdk
-
-# Run deployment script
-./deploy.sh
+# Deploy to Fargate (from project root)
+./deploy-fargate.sh --profile your-aws-profile
 ```
 
 The deployment script will:
 - ✅ Check AWS CLI configuration
 - ✅ Install dependencies
 - ✅ Bootstrap CDK (if needed)
-- ✅ Deploy all stacks
-- ✅ Provide next steps
+- ✅ Deploy all stacks (Database, Secrets, Fargate, API Gateway)
+- ✅ Build and push Docker image to ECR
+- ✅ Deploy Fargate service
+- ✅ Provide API Gateway URLs
 
 ## 🔧 **Manual Deployment**
 
@@ -67,11 +66,10 @@ cdk bootstrap
 cdk deploy --all
 
 # Or deploy specific stacks
-cdk deploy CtrlAltHealDatabaseStack
-cdk deploy CtrlAltHealSecretsStack
-cdk deploy CtrlAltHealSqsStack
-cdk deploy CtrlAltHealLambdaStack
-cdk deploy CtrlAltHealApiGatewayStack
+cdk deploy Cara-AgentsDatabaseStack
+cdk deploy Cara-AgentsSecretsStack
+cdk deploy Cara-AgentsFargateStack
+cdk deploy Cara-AgentsApiGatewayStack
 ```
 
 ## 📋 **Post-Deployment Setup**

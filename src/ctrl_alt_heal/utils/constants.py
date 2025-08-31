@@ -500,7 +500,7 @@ AWS_SERVICES = {
     "DYNAMODB": "dynamodb",
     "SECRETS_MANAGER": "secretsmanager",
     "BEDROCK": "bedrock-runtime",
-    "SQS": "sqs",
+    # "SQS": "sqs",  # Removed - no longer used with Fargate deployment
 }
 
 # DynamoDB Table Names
@@ -520,7 +520,7 @@ ENV_VARS = {
     "TELEGRAM_SECRET_NAME": "TELEGRAM_SECRET_NAME",
     "SERPER_API_KEY": "SERPER_API_KEY",
     "UPLOADS_BUCKET_NAME": "UPLOADS_BUCKET_NAME",
-    "MESSAGES_QUEUE_URL": "MESSAGES_QUEUE_URL",
+    # "MESSAGES_QUEUE_URL": "MESSAGES_QUEUE_URL",  # Removed - no longer used with Fargate deployment
 }
 
 # Telegram API Constants

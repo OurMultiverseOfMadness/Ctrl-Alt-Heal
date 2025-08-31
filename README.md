@@ -58,15 +58,18 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
 - **Data Storage**: FHIR-compliant patient records
 - **Scheduling**: Automated reminder system
 - **Knowledge Base**: Medical information retrieval service
+- **Infrastructure**: AWS Fargate with Application Load Balancer
+- **API Gateway**: External HTTPS access
+- **Container**: Docker with Python 3.12
 
 ## 🚀 **Quick Start**
 
 ### Prerequisites
 
-- **Python 3.11+**
+- **Python 3.12+**
 - **Node.js 18+** (for CDK)
 - **AWS CLI** with configured credentials
-- **Docker** (for Lambda layer builds)
+- **Docker** (for container builds)
 - **Telegram Bot Token**
 - **Amazon Bedrock access** in ap-southeast-1 region
 
@@ -80,8 +83,8 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
 
 2. **Set up development environment**
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install --upgrade pip
    pip install -r requirements.txt
    pip install -r requirements-dev.txt
@@ -96,9 +99,9 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
 
 ### Deployment
 
-1. **Build Lambda layer**
+1. **Deploy to Fargate**
    ```bash
-   ./build-layer.sh
+   ./deploy-fargate.sh --profile your-aws-profile
    ```
 
 2. **Deploy infrastructure (one command)**

@@ -1,10 +1,10 @@
 # Ctrl-Alt-Heal Architecture Documentation
 
-This document provides an overview of the architecture for the Ctrl-Alt-Heal application, a serverless, AI-powered "Care Companion" agent.
+This document provides an overview of the architecture for the Ctrl-Alt-Heal application, a containerized, AI-powered "Care Companion" agent.
 
 ## High-Level Architecture
 
-The application is designed around a central AI agent that leverages a collection of tools to perform specific tasks. It's a serverless architecture where an AWS Lambda function acts as the main entry point, processing webhooks from Telegram.
+The application is designed around a central AI agent that leverages a collection of tools to perform specific tasks. It's a containerized architecture where an AWS Fargate service acts as the main entry point, processing webhooks from Telegram via API Gateway.
 
 ```mermaid
 graph TD
@@ -14,21 +14,23 @@ graph TD
 
     subgraph AWS Cloud
         B[API Gateway]
-        C[Lambda Function: main.handler]
-        D[DynamoDB]
-        E[Amazon Bedrock]
-        F[AWS Secrets Manager]
+        C[Application Load Balancer]
+        D[Fargate Service: fargate_app]
+        E[DynamoDB]
+        F[Amazon Bedrock]
+        G[AWS Secrets Manager]
     end
 
     subgraph External APIs
-        G[Google Calendar API]
-        H[DuckDuckGo Search]
+        H[Serper Search API]
+        I[Telegram Bot API]
     end
 
     A -- sends message --> B
-    B -- triggers --> C
-    C -- manages history --> D
-    C -- invokes --> Agent
+    B -- routes to --> C
+    C -- forwards to --> D
+    D -- manages history --> E
+    D -- invokes --> Agent
 
     subgraph Agent Logic
         Agent[Care Companion Agent]
@@ -36,13 +38,13 @@ graph TD
     end
 
     Agent -- uses --> Tools
-    Tools -- Prescription Extraction --> E
-    Tools -- Save/Load Credentials --> F
-    Tools -- Calendar Events --> G
+    Tools -- Prescription Extraction --> F
+    Tools -- Save/Load Credentials --> G
     Tools -- Web Search --> H
+    Tools -- Send Messages --> I
 
-    Agent -- generates response --> C
-    C -- sends response via Telegram API --> A
+    Agent -- generates response --> D
+    D -- sends response via Telegram API --> A
 ```
 
 ## Data Models
