@@ -17,11 +17,14 @@ class DatabaseStack(Stack):
         self.env_name = environment
         self.table_prefix = f"ctrl-alt-heal-{environment}"
 
+        # Get the AWS account ID for unique bucket naming
+        account_id = cdk.Stack.of(self).account
+
         # S3 bucket for storing user uploads
         self.uploads_bucket = s3.Bucket(
             self,
             "UploadsBucket",
-            bucket_name=f"{self.table_prefix}-user-uploads",
+            bucket_name=f"{self.table_prefix}-user-uploads-{account_id}",
             removal_policy=cdk.RemovalPolicy.DESTROY,  # Change in production
             auto_delete_objects=True,  # Change in production
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -32,7 +35,7 @@ class DatabaseStack(Stack):
         self.assets_bucket = s3.Bucket(
             self,
             "AssetsBucket",
-            bucket_name=f"{self.table_prefix}-system-assets",
+            bucket_name=f"{self.table_prefix}-system-assets-{account_id}",
             removal_policy=cdk.RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             enforce_ssl=True,

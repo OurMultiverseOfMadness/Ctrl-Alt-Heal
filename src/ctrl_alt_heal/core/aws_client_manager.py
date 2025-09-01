@@ -142,7 +142,7 @@ class AWSClientManager:
         if service_name not in self._clients:
             with self._lock:
                 if service_name not in self._clients:
-                    self._clients[service_name] = self._session.client(service_name)
+                    self._clients[service_name] = self._session.client(service_name)  # type: ignore[arg-type, call-overload]
 
         return self._clients[service_name]
 

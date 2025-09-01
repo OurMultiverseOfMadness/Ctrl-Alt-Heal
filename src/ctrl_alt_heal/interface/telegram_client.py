@@ -61,7 +61,7 @@ class TelegramClient:
         """
         self.parse_mode = parse_mode
         self.message_builder = TelegramMessageBuilder(parse_mode)
-        self._last_request_time = 0
+        self._last_request_time: float = 0.0
         self._token: Optional[str] = None
 
     def _get_token(self) -> str:
@@ -170,7 +170,7 @@ class TelegramClient:
         endpoint: str,
         data: Optional[Dict[str, Any]] = None,
         files: Optional[Dict[str, Any]] = None,
-        retries: int = int(TELEGRAM_API["MAX_RETRIES"]),  # type: ignore[arg-type]
+        retries: int = int(TELEGRAM_API["MAX_RETRIES"]),  # type: ignore[arg-type, call-overload]
     ) -> Dict[str, Any]:
         """
         Make a request to the Telegram API with retry logic.

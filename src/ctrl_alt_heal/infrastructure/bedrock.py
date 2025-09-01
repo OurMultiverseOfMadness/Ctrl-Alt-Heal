@@ -43,17 +43,22 @@ class Bedrock(PrescriptionExtractor):
 
         prompt_text = (
             "Extract medications from this prescription image as JSON. "
-            "For each medication, extract: name, dosage (amount per dose), "
+            "IMPORTANT: Group related medication lines together as ONE medication. "
+            "For example, if you see 'TAB. ABCIXIMAB' and 'TAB. VOMILAST' on separate lines, "
+            "this is likely ONE medication with multiple components. "
+            "For each medication, extract: name (combine related lines), dosage (amount per dose), "
             "frequency (how often to take), duration_days (total days of treatment), "
             "totalAmount (total quantity dispensed), and additionalInstructions (special notes)."
         )
         system_prompt = (
             "You are a clinical pharmacist extracting prescription data. "
+            "IMPORTANT: Group related medication lines together as ONE medication. "
+            "For example, 'TAB. ABCIXIMAB' and 'TAB. VOMILAST' should be combined into one medication name. "
             "Reply ONLY valid JSON with NO additional text. "
             "Schema: {"
             '"medications":['
             "{"
-            '"name":"string (medication name)",'
+            '"name":"string (combined medication name from related lines)",'
             "\"dosage\":\"string (e.g. '1 tablet', '500mg', '2 capsules')\","
             "\"frequency\":\"string (e.g. 'twice daily', 'every 8 hours', 'as needed')\","
             '"duration_days":number (total treatment days, or null if not specified),'

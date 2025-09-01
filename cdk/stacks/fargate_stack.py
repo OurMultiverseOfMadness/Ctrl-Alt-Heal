@@ -28,11 +28,14 @@ class FargateStack(Stack):
 
         self.env_name = environment
 
+        # Get the AWS account ID for unique ECR repository naming
+        account_id = cdk.Stack.of(self).account
+
         # Create ECR Repository
         ecr_repository = ecr.Repository(
             self,
             "CaraAgentsECRRepo",
-            repository_name="cara-agents",
+            repository_name=f"cara-agents-{account_id}",
             image_scan_on_push=True,
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )
@@ -218,7 +221,7 @@ class FargateStack(Stack):
             "CtrlAltHealFargateService",
             cluster=cluster,
             task_definition=task_definition,
-            desired_count=1,
+            desired_count=0,  # Start with 0 tasks, auto-scaling will handle scaling up
             assign_public_ip=False,  # No public IP needed with ALB
             security_groups=[fargate_security_group],
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
@@ -226,6 +229,22 @@ class FargateStack(Stack):
 
         # Attach Fargate service to ALB target group
         fargate_service.attach_to_application_target_group(target_group)
+
+        # Auto Scaling Configuration
+        # Enable auto-scaling to scale to 0 when no activity
+        scaling = fargate_service.auto_scale_task_count(
+            min_capacity=0,  # Allow scaling to 0
+            max_capacity=2,  # Maximum 2 tasks during high load
+        )
+
+        # Scale down to 0 after 15 minutes of no activity
+        scaling.scale_on_request_count(
+            "ScaleOnRequestCount",
+            requests_per_target=1,  # Scale up when there's 1 request per target
+            scale_in_cooldown=cdk.Duration.minutes(15),  # Wait 15 minutes before scaling down
+            scale_out_cooldown=cdk.Duration.seconds(60),  # Wait 1 minute before scaling up
+            target_group=target_group,
+        )
 
         # Output the ALB URL
         cdk.CfnOutput(
@@ -262,4 +281,20 @@ class FargateStack(Stack):
             value=alb.load_balancer_arn,
             export_name=f"{self.stack_name}-ALB-ARN",
             description="ALB ARN for use by other stacks",
+        )
+
+        # Output ECS service name for deployment script
+        cdk.CfnOutput(
+            self,
+            "ECSServiceName",
+            value=fargate_service.service_name,
+            description="ECS Service Name for deployment script",
+        )
+
+        # Output ECS cluster name for deployment script
+        cdk.CfnOutput(
+            self,
+            "ECSClusterName",
+            value=cluster.cluster_name,
+            description="ECS Cluster Name for deployment script",
         )

@@ -21,7 +21,7 @@ TIME_FORMAT_12H_PATTERN = r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)"
 
 # Timezone Mappings (comprehensive)
 TIMEZONE_MAPPINGS = {
-    # US Timezones
+    # US Timezones (lowercase)
     "est": "America/New_York",
     "eastern": "America/New_York",
     "et": "America/New_York",
@@ -34,7 +34,20 @@ TIMEZONE_MAPPINGS = {
     "pst": "America/Los_Angeles",
     "pacific": "America/Los_Angeles",
     "pt": "America/Los_Angeles",
-    # International
+    # US Timezones (uppercase)
+    "EST": "America/New_York",
+    "EDT": "America/New_York",
+    "CST": "America/Chicago",
+    "CDT": "America/Chicago",
+    "MST": "America/Denver",
+    "MDT": "America/Denver",
+    "PST": "America/Los_Angeles",
+    "PDT": "America/Los_Angeles",
+    "AKST": "America/Anchorage",
+    "AKDT": "America/Anchorage",
+    "HST": "Pacific/Honolulu",
+    "HDT": "Pacific/Honolulu",
+    # International (lowercase)
     "gmt": "Europe/London",
     "utc": "UTC",
     "bst": "Europe/London",  # British Summer Time
@@ -45,7 +58,24 @@ TIMEZONE_MAPPINGS = {
     "ist": "Asia/Kolkata",  # India Standard Time
     "cst_china": "Asia/Shanghai",  # China Standard Time
     "sgt": "Asia/Singapore",  # Singapore Time
-    # Cities (common requests)
+    # International (uppercase)
+    "UTC": "UTC",
+    "GMT": "UTC",
+    "SGT": "Asia/Singapore",
+    "JST": "Asia/Tokyo",
+    "IST": "Asia/Kolkata",
+    "AEST": "Australia/Sydney",
+    "AEDT": "Australia/Sydney",
+    "NZST": "Pacific/Auckland",
+    "NZDT": "Pacific/Auckland",
+    # Common Names
+    "Pacific Time": "America/Los_Angeles",
+    "Eastern Time": "America/New_York",
+    "Central Time": "America/Chicago",
+    "Mountain Time": "America/Denver",
+    "Alaska Time": "America/Anchorage",
+    "Hawaii Time": "Pacific/Honolulu",
+    # Cities (lowercase)
     "new york": "America/New_York",
     "london": "Europe/London",
     "paris": "Europe/Paris",
@@ -59,55 +89,7 @@ TIMEZONE_MAPPINGS = {
     "delhi": "Asia/Kolkata",
     "beijing": "Asia/Shanghai",
     "shanghai": "Asia/Shanghai",
-}
-
-# Frequency to Time Mappings
-FREQUENCY_TIME_MAPPINGS = {
-    "morning": ["08:00"],
-    "evening": ["20:00"],
-    "night": ["20:00"],
-    "afternoon": ["12:00"],
-    "noon": ["12:00"],
-    "twice": ["08:00", "20:00"],
-    "thrice": ["08:00", "14:00", "20:00"],
-    "three": ["08:00", "14:00", "20:00"],
-    "four": ["08:00", "12:00", "16:00", "20:00"],
-}
-
-# Timezone Mappings
-TIMEZONE_MAPPINGS = {
-    # US Timezones
-    "EST": "America/New_York",
-    "EDT": "America/New_York",
-    "CST": "America/Chicago",
-    "CDT": "America/Chicago",
-    "MST": "America/Denver",
-    "MDT": "America/Denver",
-    "PST": "America/Los_Angeles",
-    "PDT": "America/Los_Angeles",
-    "AKST": "America/Anchorage",
-    "AKDT": "America/Anchorage",
-    "HST": "Pacific/Honolulu",
-    "HDT": "Pacific/Honolulu",
-    # International Timezones
-    "UTC": "UTC",
-    "GMT": "UTC",
-    "SGT": "Asia/Singapore",
-    "JST": "Asia/Tokyo",
-    # "CST": "Asia/Shanghai",  # Duplicate key, already defined above
-    "IST": "Asia/Kolkata",
-    "AEST": "Australia/Sydney",
-    "AEDT": "Australia/Sydney",
-    "NZST": "Pacific/Auckland",
-    "NZDT": "Pacific/Auckland",
-    # Common Names
-    "Pacific Time": "America/Los_Angeles",
-    "Eastern Time": "America/New_York",
-    "Central Time": "America/Chicago",
-    "Mountain Time": "America/Denver",
-    "Alaska Time": "America/Anchorage",
-    "Hawaii Time": "Pacific/Honolulu",
-    # Major Cities
+    # Cities (proper case)
     "New York": "America/New_York",
     "Los Angeles": "America/Los_Angeles",
     "Chicago": "America/Chicago",
@@ -153,6 +135,20 @@ TIMEZONE_MAPPINGS = {
     "Vancouver": "America/Vancouver",
     "Montreal": "America/Montreal",
 }
+
+# Frequency to Time Mappings
+FREQUENCY_TIME_MAPPINGS = {
+    "morning": ["08:00"],
+    "evening": ["20:00"],
+    "night": ["20:00"],
+    "afternoon": ["12:00"],
+    "noon": ["12:00"],
+    "twice": ["08:00", "20:00"],
+    "thrice": ["08:00", "14:00", "20:00"],
+    "three": ["08:00", "14:00", "20:00"],
+    "four": ["08:00", "12:00", "16:00", "20:00"],
+}
+
 
 # Language to Timezone Mappings
 LANGUAGE_TIMEZONE_MAPPINGS = {
@@ -530,11 +526,11 @@ TELEGRAM_API = {
     "SEND_FILE_ENDPOINT": "/sendDocument",
     "GET_FILE_ENDPOINT": "/getFile",
     "GET_FILE_PATH_ENDPOINT": "/getFile",
-    "TIMEOUT": 30,
+    "TIMEOUT": 30.0,
     "MAX_MESSAGE_LENGTH": 4096,
     "MAX_CAPTION_LENGTH": 1024,
     "MAX_RETRIES": 3,
-    "RETRY_DELAY": 1,  # seconds
+    "RETRY_DELAY": 1.0,  # seconds
     "RATE_LIMIT_DELAY": 0.1,  # seconds between requests
 }
 

@@ -30,9 +30,11 @@ from .medication_schedule_tool import (
     get_user_prescriptions_tool,
     show_all_medications_tool,
 )
-from .medication_ics_tool import (
-    generate_medication_ics_tool,
-    generate_single_medication_ics_tool,
+
+# Import wrapped versions from care_companion for auto-sending functionality
+from ..agent.care_companion import (
+    wrapped_generate_medication_ics_tool,
+    wrapped_generate_single_medication_ics_tool,
 )
 
 # A simple registry for tools that need to be manually invoked
@@ -57,6 +59,6 @@ tool_registry: dict[str, Callable[..., Any]] = {
     "clear_medication_schedule": clear_medication_schedule_tool,
     "get_user_prescriptions": get_user_prescriptions_tool,
     "show_all_medications": show_all_medications_tool,
-    "generate_medication_ics": generate_medication_ics_tool,
-    "generate_single_medication_ics": generate_single_medication_ics_tool,
+    "generate_medication_ics": wrapped_generate_medication_ics_tool,
+    "generate_single_medication_ics": wrapped_generate_single_medication_ics_tool,
 }

@@ -76,8 +76,9 @@ class TelegramFormatter:
         Returns:
             HTML formatted text
         """
-        # Escape HTML special characters
-        text = self._escape_html(text)
+        # Telegram HTML mode doesn't need HTML escaping - it handles special characters naturally
+        # Only escape < and > to prevent HTML injection
+        text = text.replace("<", "&lt;").replace(">", "&gt;")
 
         # Convert markdown-style formatting to HTML
         # Bold: **text** -> <b>text</b>

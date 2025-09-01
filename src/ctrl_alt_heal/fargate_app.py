@@ -198,6 +198,18 @@ async def process_message(message: dict[str, Any], chat_id: str) -> None:
         history_store = HistoryStore()
         conversation_history = history_store.get_latest_history(user_id)
 
+        # Debug: Log what we're loading
+        if conversation_history:
+            logger.info(
+                f"Loaded history with {len(conversation_history.history)} messages"
+            )
+            for i, msg in enumerate(
+                conversation_history.history[-3:]
+            ):  # Show last 3 messages
+                logger.info(f"  Loaded message {i}: {msg.role} - {msg.content[:50]}...")
+        else:
+            logger.info("No existing history found")
+
         # Check if we should create a new session based on inactivity
         should_create, reason = should_create_new_session(
             conversation_history, SESSION_TIMEOUT_MINUTES
@@ -223,6 +235,15 @@ async def process_message(message: dict[str, Any], chat_id: str) -> None:
         # Log session status for debugging
         session_status = get_session_status(conversation_history)
         logger.info(f"Session status: {session_status['reason']}")
+
+        # Ensure user exists before proceeding
+        if not user:
+            logger.error("Failed to create or retrieve user")
+            send_telegram_message_with_retry(
+                chat_id,
+                "Sorry, I encountered an error setting up your profile. Please try again.",
+            )
+            return
 
         # Route to appropriate handler
         if "text" in message:
@@ -253,8 +274,21 @@ async def handle_text_message(
     # Update session timestamp
     history = update_session_timestamp(history)
 
+    # Set chat_id for file sending tools
+    from ctrl_alt_heal.agent.care_companion import (
+        set_chat_id_for_file_sending,
+    )
+
+    set_chat_id_for_file_sending(chat_id)
+
     # Get agent and process
     agent = get_agent(user, history)
+
+    # Debug: Log the history being passed to the agent
+    logger.info(f"History being passed to agent: {len(history.history)} messages")
+    for i, msg in enumerate(history.history[-5:]):  # Show last 5 messages
+        logger.info(f"  Message {i}: {msg.role} - {msg.content[:100]}...")
+
     response_obj = agent(text)
 
     # Process response
@@ -334,6 +368,22 @@ async def handle_photo_message(
     )
 
     # Re-engage the agent with the results
+    # Debug: Log the history being passed to the agent for image processing
+    logger.info(
+        f"(Image processing) History being passed to agent: {len(history.history)} messages"
+    )
+    for i, msg in enumerate(history.history[-5:]):  # Show last 5 messages
+        logger.info(
+            f"  (Image processing) Message {i}: {msg.role} - {msg.content[:100]}..."
+        )
+
+    # Set chat_id for file sending tools
+    from ctrl_alt_heal.agent.care_companion import (
+        set_chat_id_for_file_sending,
+    )
+
+    set_chat_id_for_file_sending(chat_id)
+
     agent = get_agent(user, history)
 
     if extraction_result.get("status") == "success":
@@ -507,17 +557,19 @@ async def process_agent_response(
 
                         tool_result = show_all_medications_tool(**tool_args)
                     elif tool_name == "generate_medication_ics":
-                        from ctrl_alt_heal.tools.medication_ics_tool import (
-                            generate_medication_ics_tool,
+                        from ctrl_alt_heal.agent.care_companion import (
+                            wrapped_generate_medication_ics_tool,
                         )
 
-                        tool_result = generate_medication_ics_tool(**tool_args)
+                        tool_result = wrapped_generate_medication_ics_tool(**tool_args)
                     elif tool_name == "generate_single_medication_ics":
-                        from ctrl_alt_heal.tools.medication_ics_tool import (
-                            generate_single_medication_ics_tool,
+                        from ctrl_alt_heal.agent.care_companion import (
+                            wrapped_generate_single_medication_ics_tool,
                         )
 
-                        tool_result = generate_single_medication_ics_tool(**tool_args)
+                        tool_result = wrapped_generate_single_medication_ics_tool(
+                            **tool_args
+                        )
                     else:
                         logger.warning(f"Unknown tool: {tool_name}")
                         tool_result = {
@@ -544,17 +596,146 @@ async def process_agent_response(
         else:
             # Handle final message
             response_str = str(agent_response_obj)
+            logger.info("=== AGENT RESPONSE DEBUG ===")
+            logger.info(f"Raw agent response: {response_str}")
+            logger.info(f"Response type: {type(agent_response_obj)}")
+            logger.info(f"Contains <br> tags: {'<br>' in response_str}")
+            logger.info(f"Contains </thinking>: {'</thinking>' in response_str}")
+            logger.info(f"Response length: {len(response_str)}")
+
+            # Extract the actual message content from the agent response
             if "</thinking>" in response_str:
-                final_message = response_str.split("</thinking>")[-1].strip()
+                # Split by </thinking> and take everything after it
+                parts = response_str.split("</thinking>")
+                if len(parts) > 1:
+                    final_message = parts[-1].strip()
+                    logger.info(
+                        f"Extracted message after </thinking>: '{final_message}'"
+                    )
+                else:
+                    final_message = response_str
+                    logger.info("No content after </thinking>, using full response")
             else:
                 final_message = response_str
+                logger.info("No </thinking> tag found, using full response")
+
+            # If the message is empty or only contains thinking, generate a fallback
+            if not final_message or final_message.isspace():
+                logger.warning("Agent response is empty, generating fallback message")
+                final_message = (
+                    "I'm processing your request. Please give me a moment to respond."
+                )
+            elif final_message.startswith("<thinking>") and final_message.endswith(
+                "</thinking>"
+            ):
+                logger.warning(
+                    "Agent response only contains thinking, generating fallback message"
+                )
+                final_message = (
+                    "I'm processing your request. Please give me a moment to respond."
+                )
+
+            logger.info(f"Final message before formatting: {final_message}")
+            logger.info("=== END AGENT RESPONSE DEBUG ===")
+
+            # Clean HTML entities from the agent response (temporary fix)
+            import html
+
+            final_message = html.unescape(final_message)
+            logger.info(f"After HTML unescaping: {final_message}")
+
+            # Try different Telegram parse modes to handle formatting issues
+            from ctrl_alt_heal.utils.telegram_formatter import (
+                TelegramFormatter,
+                TelegramParseMode,
+            )
+            import re
+
+            logger.info("=== TELEGRAM FORMATTING DEBUG ===")
+            logger.info(f"Original message: {final_message}")
+
+            # Try different parse modes in order of preference
+            parse_modes_to_try = [
+                TelegramParseMode.HTML,  # Most forgiving - handles bullet points well
+                TelegramParseMode.PLAIN_TEXT,  # Fallback - no formatting
+            ]
+
+            success = False
+            selected_parse_mode = TelegramParseMode.PLAIN_TEXT  # Default fallback
+
+            for parse_mode in parse_modes_to_try:
+                try:
+                    logger.info(f"Trying parse mode: {parse_mode.value}")
+                    formatter = TelegramFormatter(parse_mode)
+
+                    if parse_mode == TelegramParseMode.PLAIN_TEXT:
+                        # For plain text, clean all formatting
+                        cleaned_message = formatter.clean_formatting(final_message)
+                        # Replace <br> with newlines
+                        cleaned_message = re.sub(
+                            r"<br\s*/?>", "\n", cleaned_message, flags=re.IGNORECASE
+                        )
+                        # Remove any remaining HTML tags
+                        cleaned_message = re.sub(r"<[^>]+>", "", cleaned_message)
+                        final_message = cleaned_message
+                    else:
+                        # For HTML mode, format properly
+                        # First replace <br> tags with newlines
+                        if "<br>" in final_message:
+                            final_message = re.sub(
+                                r"<br\s*/?>", "\n", final_message, flags=re.IGNORECASE
+                            )
+
+                        # Convert bullet points from - to • for better HTML compatibility
+                        final_message = re.sub(
+                            r"^\- ", "• ", final_message, flags=re.MULTILINE
+                        )
+                        final_message = re.sub(r"\n\- ", "\n• ", final_message)
+
+                        final_message = formatter._apply_formatting(final_message)
+
+                    logger.info(f"Formatted with {parse_mode.value}: {final_message}")
+                    selected_parse_mode = parse_mode
+                    success = True
+                    break
+
+                except Exception as e:
+                    logger.warning(f"Failed with {parse_mode.value}: {e}")
+                    continue
+
+            if not success:
+                logger.warning("All parse modes failed, using plain text fallback")
+                # Ultimate fallback - strip all formatting
+                final_message = re.sub(r"<[^>]+>", "", final_message)
+                final_message = re.sub(
+                    r"\*\*(.*?)\*\*", r"\1", final_message
+                )  # Remove bold
+                final_message = re.sub(
+                    r"\*(.*?)\*", r"\1", final_message
+                )  # Remove italic
+                final_message = re.sub(r"`(.*?)`", r"\1", final_message)  # Remove code
+                final_message = re.sub(
+                    r"\[([^\]]+)\]\([^)]+\)", r"\1", final_message
+                )  # Remove links
+
+            logger.info(f"Final message to send: {final_message}")
+            logger.info(f"Selected parse mode: {selected_parse_mode.value}")
+            logger.info("=== END TELEGRAM FORMATTING DEBUG ===")
 
             history.history.append(Message(role="assistant", content=final_message))
             history_store = HistoryStore()
             history_store.save_history(history)
 
+            # Debug: Log what we're saving
+            logger.info(f"Saving history with {len(history.history)} messages")
+            for i, msg in enumerate(history.history[-3:]):  # Show last 3 messages
+                logger.info(f"  Saved message {i}: {msg.role} - {msg.content[:50]}...")
+
             logger.info("Agent generated response. Preparing to send to Telegram.")
-            send_telegram_message_with_retry(chat_id, final_message)
+            # Use the selected parse mode (HTML preferred, with plain text fallback)
+            send_telegram_message_with_retry(
+                chat_id, final_message, parse_mode=selected_parse_mode
+            )
             logger.info("Finished sending message to Telegram.")
 
     except Exception as e:

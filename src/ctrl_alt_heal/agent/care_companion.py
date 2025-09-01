@@ -59,6 +59,8 @@ _current_chat_id = None
 def set_chat_id_for_file_sending(chat_id: str):
     """Set the chat ID for automatic file sending in tool wrappers."""
     global _current_chat_id
+    logger = logging.getLogger(__name__)
+    logger.info(f"DEBUG: Setting _current_chat_id to {chat_id}")
     _current_chat_id = chat_id
 
 
@@ -100,6 +102,8 @@ def wrapped_generate_medication_ics_tool(
     global _current_chat_id
     logger = logging.getLogger(__name__)
 
+    logger.info(f"DEBUG: _current_chat_id = {_current_chat_id}")
+
     # Call the original tool
     result = generate_medication_ics_tool(
         user_id=user_id,
@@ -107,6 +111,8 @@ def wrapped_generate_medication_ics_tool(
         reminder_minutes=reminder_minutes,
         include_notes=include_notes,
     )
+
+    logger.info(f"DEBUG: Result from generate_medication_ics_tool: {result}")
 
     # If successful and we have ICS content, send it via Telegram
     if (
@@ -127,9 +133,12 @@ def wrapped_generate_medication_ics_tool(
             send_telegram_file(_current_chat_id, ics_content, filename, caption)
             logger.info("Successfully auto-sent ICS file")
 
-            # Update the result message to indicate file was sent
+            # Update the result message to indicate file was sent and no further action needed
             result["message"] = (
-                result["message"] + " The calendar file has been sent to you!"
+                "✅ ICS calendar file generated and sent successfully! "
+                f"The file contains {result.get('events_created', 0)} reminder events for your medications. "
+                "You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). "
+                "Each reminder will show 15 minutes before it's time to take your medication."
             )
 
         except Exception as e:
@@ -217,9 +226,12 @@ def wrapped_generate_single_medication_ics_tool(
             send_telegram_file(_current_chat_id, ics_content, filename, caption)
             logger.info("Successfully auto-sent single ICS file")
 
-            # Update the result message to indicate file was sent
+            # Update the result message to indicate file was sent and no further action needed
             result["message"] = (
-                result["message"] + " The calendar file has been sent to you!"
+                f"✅ ICS calendar file for {medication_name} generated and sent successfully! "
+                f"The file contains {result.get('events_created', 0)} reminder events. "
+                "You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). "
+                "Each reminder will show 15 minutes before it's time to take your medication."
             )
 
         except Exception as e:

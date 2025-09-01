@@ -1,4 +1,8 @@
-"""Tool for generating ICS calendar files for medication reminders."""
+"""Tool for generating ICS calendar files for medication reminders.
+
+This tool intelligently groups medications with the same timing into single calendar events,
+making it easier for users to manage multiple medications that need to be taken together.
+"""
 
 from __future__ import annotations
 
@@ -39,7 +43,8 @@ def set_chat_id_for_file_sending(chat_id: str):
     name="generate_medication_ics",
     description=(
         "Generates an ICS calendar file for medication reminders that users can import "
-        "into any calendar app. Creates recurring events for each medication schedule. "
+        "into any calendar app. Intelligently groups medications with the same timing "
+        "into single events for convenience. Creates recurring events for each medication schedule. "
         "Example triggers: 'Create a calendar file for my medications', "
         "'Generate calendar reminders for my pills', 'Export my medication schedule to calendar'"
     ),
@@ -136,6 +141,8 @@ def generate_medication_ics_tool(
     events_created = 0
 
     # First, collect all medications and their times to group them
+    # This intelligent grouping creates single calendar events for medications
+    # that need to be taken at the same time, reducing calendar clutter
     time_medications: Dict[
         str, List[Tuple[Dict[str, Any], date]]
     ] = {}  # time_str -> list of (med, end_date) tuples
@@ -167,6 +174,7 @@ def generate_medication_ics_tool(
             time_medications[time_str].append((med, end_date_user_tz))
 
     # Now create merged events for each time slot
+    # Each time slot gets one event that lists all medications to take at that time
     for time_str, medications in time_medications.items():
         try:
             # Parse time
@@ -202,7 +210,12 @@ def generate_medication_ics_tool(
                     if include_notes and med["dosage"]:
                         event_title += f" ({med['dosage']})"
                 else:
-                    event_title = f"💊 Take {len(medications)} medications"
+                    # Create a more descriptive title for combined medications
+                    med_names = [med["name"] for med, _ in medications]
+                    if len(med_names) <= 3:
+                        event_title = f"💊 Take: {', '.join(med_names)}"
+                    else:
+                        event_title = f"💊 Take {len(medications)} medications"
 
                 event.name = event_title
 
@@ -236,6 +249,13 @@ def generate_medication_ics_tool(
                             med_desc += f" ({med['frequency']})"
                         description_parts.append(med_desc)
 
+                    # Add a helpful note about combined reminders
+                    if len(medications) > 1:
+                        description_parts.append(
+                            f"\n💡 All {len(medications)} medications are scheduled for the same time ({time_str}) "
+                            "so you can take them together!"
+                        )
+
                 description_parts.append(
                     "\n--- Created by Cara, your Care Companion ---"
                 )
@@ -250,7 +270,12 @@ def generate_medication_ics_tool(
                             f"Take {med['name']} in {reminder_minutes} minutes"
                         )
                     else:
-                        alarm.description = f"Take {len(medications)} medications in {reminder_minutes} minutes"
+                        # Create more descriptive alarm for combined medications
+                        med_names = [med["name"] for med, _ in medications]
+                        if len(med_names) <= 2:
+                            alarm.description = f"Take {', '.join(med_names)} in {reminder_minutes} minutes"
+                        else:
+                            alarm.description = f"Take {len(medications)} medications in {reminder_minutes} minutes"
                     event.alarms.append(alarm)
 
                 calendar.events.add(event)
@@ -274,7 +299,12 @@ def generate_medication_ics_tool(
     if len(med_names) == 1:
         summary_text = f"medication reminders for {med_names[0]}"
     else:
-        summary_text = f"medication reminders for {len(med_names)} medications"
+        # Count unique time slots to show grouping benefit
+        unique_times = len(time_medications)
+        if unique_times < len(med_names):
+            summary_text = f"medication reminders for {len(med_names)} medications (grouped into {unique_times} time slots)"
+        else:
+            summary_text = f"medication reminders for {len(med_names)} medications"
 
     # Auto-send the ICS file via Telegram
     logger = logging.getLogger(__name__)
@@ -283,18 +313,18 @@ def generate_medication_ics_tool(
             filename = (
                 f"medication_reminders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ics"
             )
-            caption = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events. You can import this into any calendar app."
+            caption = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events. Medications with the same timing are grouped together for convenience. You can import this into any calendar app."
 
             send_telegram_file(_current_chat_id, ics_content, filename, caption)
 
             # Update the message to indicate file was sent
-            message = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events and has been sent to you. You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). Each reminder will show {reminder_minutes} minutes before it's time to take your medication."
+            message = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events and has been sent to you. Medications with the same timing are grouped together for convenience. You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). Each reminder will show {reminder_minutes} minutes before it's time to take your medication."
         else:
-            message = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events. You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). Each reminder will show {reminder_minutes} minutes before it's time to take your medication."
+            message = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events. Medications with the same timing are grouped together for convenience. You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). Each reminder will show {reminder_minutes} minutes before it's time to take your medication."
 
     except Exception as e:
         logger.error(f"Failed to auto-send ICS file: {e}")
-        message = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events. You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). Each reminder will show {reminder_minutes} minutes before it's time to take your medication."
+        message = f"I've created a calendar file with {summary_text}! The file contains {events_created} recurring reminder events. Medications with the same timing are grouped together for convenience. You can import this into any calendar app (Google Calendar, Apple Calendar, Outlook, etc.). Each reminder will show {reminder_minutes} minutes before it's time to take your medication."
 
     return {
         "status": "success",
@@ -312,6 +342,8 @@ def generate_medication_ics_tool(
         "Generates an ICS calendar file for a specific medication with custom times. "
         "Use this when a user wants to create calendar reminders for a specific medication "
         "with specific times, without setting up the full medication schedule first. "
+        "Note: For multiple medications, use 'generate_medication_ics' which automatically "
+        "groups medications with the same timing into single events. "
         "Example triggers: 'Create calendar reminders for Metformin at 8 AM and 8 PM', "
         "'Make calendar events for my blood pressure medication'"
     ),

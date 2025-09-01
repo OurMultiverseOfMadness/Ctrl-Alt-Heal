@@ -2,15 +2,13 @@
 import os
 import aws_cdk as cdk
 
-from stacks.database_stack import DatabaseStack
 from stacks.fargate_stack import FargateStack
 from stacks.secrets_stack import SecretsStack
-from stacks.api_gateway_stack import ApiGatewayStack
 
 app = cdk.App()
 
 # Get environment configuration from environment variables or use defaults
-aws_account = os.environ.get("CDK_DEFAULT_ACCOUNT", "532003627730")
+aws_account = os.environ.get("CDK_DEFAULT_ACCOUNT", "056445322359")
 aws_region = os.environ.get("CDK_DEFAULT_REGION", "ap-southeast-1")
 
 # Define the AWS environment
@@ -20,14 +18,6 @@ aws_env = cdk.Environment(account=aws_account, region=aws_region)
 environment = os.environ.get("ENVIRONMENT", "production")
 project_name = os.environ.get("PROJECT_NAME", "Cara-Agents")
 
-# Create the database stack
-database_stack = DatabaseStack(
-    app,
-    f"{project_name}DatabaseStack",
-    env=aws_env,
-    environment=environment,
-)
-
 # Create the secrets stack
 secrets_stack = SecretsStack(
     app,
@@ -36,27 +26,14 @@ secrets_stack = SecretsStack(
     environment=environment,
 )
 
-# Create the Fargate stack, passing the database and secrets stacks
+# Create the Fargate stack without database dependency
 fargate_stack = FargateStack(
     app,
     f"{project_name}FargateStack",
-    database_stack=database_stack,
+    database_stack=None,  # No database dependency
     secrets_stack=secrets_stack,
     env=aws_env,
     environment=environment,
 )
-
-# Create the API Gateway stack, passing the VPC and ALB from Fargate stack
-api_gateway_stack = ApiGatewayStack(
-    app,
-    f"{project_name}ApiGatewayStack",
-    vpc=fargate_stack.vpc,
-    alb=fargate_stack.alb,
-    env=aws_env,
-    environment=environment,
-)
-
-# Add dependency to ensure Fargate stack is deployed before API Gateway
-api_gateway_stack.add_dependency(fargate_stack)
 
 app.synth()

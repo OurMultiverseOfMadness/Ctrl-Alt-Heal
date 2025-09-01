@@ -147,9 +147,18 @@ echo -e "${GREEN}✅ CDK stacks deployed successfully!${NC}"
 # Go back to root directory
 cd ..
 
+# Get AWS account ID for unique ECR repository naming
+echo -e "${BLUE}🔍 Getting AWS account ID...${NC}"
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text $AWS_PROFILE_ARG)
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Failed to get AWS account ID!${NC}"
+    exit 1
+fi
+echo -e "${GREEN}📋 Using AWS Account ID: $AWS_ACCOUNT_ID${NC}"
+
 # Build and push Docker image to ECR
 echo -e "${BLUE}🐳 Building and pushing Docker image to ECR...${NC}"
-PROJECT_NAME_LOWERCASE="cara-agents" ./build-and-push-ecr.sh --profile "$AWS_PROFILE" --environment "$ENVIRONMENT" --region "$AWS_REGION"
+PROJECT_NAME_LOWERCASE="cara-agents-${AWS_ACCOUNT_ID}" ./build-and-push-ecr.sh --profile "$AWS_PROFILE" --environment "$ENVIRONMENT" --region "$AWS_REGION"
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ Docker build and push failed!${NC}"
@@ -157,6 +166,58 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "${GREEN}✅ Docker image pushed to ECR successfully!${NC}"
+
+# Force new ECS deployment to use the latest image
+echo -e "${BLUE}🔄 Forcing new ECS deployment to use latest image...${NC}"
+
+# Get the ECS service name from CloudFormation outputs
+ECS_SERVICE_NAME=$(aws cloudformation describe-stacks \
+    --stack-name "${PROJECT_NAME}FargateStack" \
+    --query 'Stacks[0].Outputs[?OutputKey==`ECSServiceName`].OutputValue' \
+    --output text \
+    $AWS_PROFILE_ARG)
+
+ECS_CLUSTER_NAME=$(aws cloudformation describe-stacks \
+    --stack-name "${PROJECT_NAME}FargateStack" \
+    --query 'Stacks[0].Outputs[?OutputKey==`ECSClusterName`].OutputValue' \
+    --output text \
+    $AWS_PROFILE_ARG)
+
+if [[ -n "$ECS_SERVICE_NAME" && -n "$ECS_CLUSTER_NAME" ]]; then
+    echo -e "${BLUE}📋 ECS Cluster: ${YELLOW}${ECS_CLUSTER_NAME}${NC}"
+    echo -e "${BLUE}📋 ECS Service: ${YELLOW}${ECS_SERVICE_NAME}${NC}"
+
+    # Force new deployment
+    aws ecs update-service \
+        --cluster "$ECS_CLUSTER_NAME" \
+        --service "$ECS_SERVICE_NAME" \
+        --force-new-deployment \
+        $AWS_PROFILE_ARG
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ ECS deployment initiated successfully!${NC}"
+        echo -e "${BLUE}⏳ Waiting for deployment to complete...${NC}"
+
+        # Wait for deployment to complete
+        aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER_NAME" \
+            --services "$ECS_SERVICE_NAME" \
+            $AWS_PROFILE_ARG
+
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ ECS deployment completed successfully!${NC}"
+        else
+            echo -e "${YELLOW}⚠️  ECS deployment may still be in progress. Check AWS Console for status.${NC}"
+        fi
+    else
+        echo -e "${RED}❌ Failed to initiate ECS deployment!${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}⚠️  Could not retrieve ECS service information. Manual deployment may be required.${NC}"
+fi
+
+echo ""
 
 # Get the webhook URL from CloudFormation outputs
 echo -e "${BLUE}🔗 Getting API Gateway webhook URL...${NC}"
