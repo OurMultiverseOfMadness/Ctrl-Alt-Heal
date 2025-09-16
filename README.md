@@ -6,6 +6,38 @@
 
 Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between patients and their healthcare providers. Many patients struggle with understanding and following their doctor's instructions, leading to suboptimal treatment outcomes. Our AI companion addresses this challenge by providing clear communication, automated reminders, and proactive support throughout the recovery journey.
 
+## 🔗 Quick Links
+
+### 📚 **Documentation**
+- **[📖 Complete Documentation](./docs/README.md)** - Full documentation index
+- **[🏗️ Architecture Guide](./docs/architecture.md)** - System design and architecture
+- **[🔧 Development Guide](./docs/development.md)** - Setup and development workflow
+- **[📊 Core Services](./docs/core-services.md)** - Core infrastructure documentation
+- **[📋 Data Models](./docs/data-models.md)** - Data model documentation
+
+### 💻 **Local Development**
+- **[🚀 Local Development Guide](./LOCAL_DEVELOPMENT.md)** - Complete local setup guide
+- **[⚙️ Environment Configuration](./env.example)** - Example environment file
+- **[🔧 Setup Scripts](./scripts/README.md)** - Development and deployment scripts
+
+### 🏗️ **Infrastructure & Deployment**
+- **[☁️ CDK Infrastructure](./cdk/README.md)** - Infrastructure as Code documentation
+- **[📦 CDK Stacks](./cdk/stacks/README.md)** - AWS resource definitions
+- **[🚀 Deployment Guide](./cdk/DEPLOYMENT.md)** - Step-by-step deployment instructions
+
+### 🧪 **Testing & Quality**
+- **[🧪 Test Suite](./tests/README.md)** - Comprehensive test documentation
+- **[✅ Quality Checks](./scripts/run_quality_checks.sh)** - Automated quality assurance
+- **[🔍 Git Status Check](./scripts/check_git_status.sh)** - Pre-commit validation
+
+### 📁 **Source Code Structure**
+- **[🤖 AI Agent System](./src/ctrl_alt_heal/agent/README.md)** - AI agent implementation
+- **[🔧 Core Services](./src/ctrl_alt_heal/core/README.md)** - Core infrastructure services
+- **[🏗️ Infrastructure Layer](./src/ctrl_alt_heal/infrastructure/README.md)** - AWS integrations
+- **[🛠️ AI Tools](./src/ctrl_alt_heal/tools/README.md)** - AI agent tools and utilities
+- **[💬 Interface Layer](./src/ctrl_alt_heal/interface/README.md)** - Telegram and API interfaces
+- **[🔧 Utilities](./src/ctrl_alt_heal/utils/README.md)** - Helper functions and utilities
+
 ## 🚀 Key Features
 
 ### 📋 **Smart Prescription Processing**
@@ -83,12 +115,21 @@ This repository is submitted for a hackathon and contains:
 
 ### Prerequisites
 
+#### **Development Tools**
 - **Python 3.12+**
 - **Node.js 18+** (for CDK)
-- **AWS CLI** with configured credentials
 - **Docker** (for container builds)
-- **Telegram Bot Token**
-- **Amazon Bedrock access** in ap-southeast-1 region
+- **Git**
+
+#### **AWS Account Setup**
+- **AWS Account** with billing enabled
+- **AWS CLI** configured with appropriate permissions
+- **Amazon Bedrock access** enabled in ap-southeast-1 region
+- **IAM permissions** for: ECS, ECR, DynamoDB, S3, Secrets Manager, API Gateway, CloudFormation
+
+#### **External Services**
+- **Telegram Bot Token** (create via @BotFather)
+- **Serper API Key** (sign up at serper.dev)
 
 ### Installation
 
@@ -107,38 +148,123 @@ This repository is submitted for a hackathon and contains:
    pip install -r requirements-dev.txt
    ```
 
-3. **Install CDK dependencies**
+3. **Configure environment variables**
+   ```bash
+   cp env.example .env
+   # Edit .env with your configuration values
+   ```
+
+4. **Install CDK dependencies**
    ```bash
    cd cdk
    npm install
    cd ..
    ```
 
+### AWS Account Setup
+
+1. **Enable Amazon Bedrock**
+   ```bash
+   # Navigate to AWS Console > Bedrock > Model access
+   # Request access to: Amazon Nova Lite (APAC)
+   # Region: ap-southeast-1 (Singapore)
+   ```
+
+2. **Configure AWS CLI**
+   ```bash
+   aws configure
+   # Enter your AWS Access Key ID, Secret Access Key, and region
+   ```
+
+3. **Create Telegram Bot**
+   ```bash
+   # Message @BotFather on Telegram
+   # Use /newbot command
+   # Save the bot token for later
+   ```
+
+4. **Get Serper API Key**
+   ```bash
+   # Visit https://serper.dev
+   # Sign up for free account
+   # Get your API key from dashboard
+   ```
+
 ### Deployment
 
-1. **Deploy to Fargate**
+1. **Deploy Infrastructure (One Command)**
    ```bash
+   # Deploy everything to AWS
    ./deploy-fargate.sh --profile your-aws-profile
    ```
 
-2. **Deploy infrastructure (one command)**
+   This script will:
+   - ✅ Bootstrap CDK (if needed)
+   - ✅ Deploy all AWS resources (DynamoDB, S3, ECR, ECS, API Gateway)
+   - ✅ Build and push Docker image
+   - ✅ Deploy Fargate service
+   - ✅ Provide API Gateway URLs
+
+2. **Configure Secrets**
    ```bash
-   cd cdk
-   ./deploy.sh
-   cd ..
+   # Set up Telegram bot token
+   python scripts/update_telegram_secret.py your_telegram_bot_token
+
+   # Set up Serper API key
+   python scripts/update_serper_secret.py your_serper_api_key
    ```
 
-3. **Configure secrets**
+3. **Configure Telegram Webhook**
    ```bash
-   # Update secrets in AWS Secrets Manager
-   aws secretsmanager update-secret \
-     --secret-id "ctrl-alt-heal/dev/telegram/bot-token" \
-     --secret-string '{"value": "your_telegram_bot_token"}'
-
-   aws secretsmanager update-secret \
-     --secret-id "ctrl-alt-heal/dev/serper/api-key" \
-     --secret-string '{"api_key": "your_serper_api_key"}'
+   # Get the webhook URL from deployment output
+   # Set webhook via Telegram API
+   curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://your-api-gateway-url/webhook"}'
    ```
+
+4. **Test Deployment**
+   ```bash
+   # Send a message to your Telegram bot
+   # Check CloudWatch logs for any errors
+   aws logs describe-log-groups --log-group-name-prefix "/aws/ecs/ctrl-alt-heal"
+   ```
+
+## 💻 **Local Development**
+
+For development and testing, you can run the application locally:
+
+### **Quick Local Setup**
+
+```bash
+# Set up local development environment
+python scripts/setup_local_dev.py
+
+# Start local server
+python scripts/local_webhook.py
+```
+
+**Local server will be available at:**
+- **API**: http://localhost:8000
+- **Health Check**: http://localhost:8000/health
+- **API Docs**: http://localhost:8000/docs
+- **Webhook**: http://localhost:8000/webhook
+
+**Mock Mode**: The local setup includes mock AI responses, so you don't need AWS Bedrock access for basic development and testing.
+
+### **Telegram Webhook Testing**
+
+```bash
+# Expose local server with ngrok
+ngrok http 8000
+
+# Set webhook to your ngrok URL
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://your-ngrok-url.ngrok.io/webhook"}'
+```
+
+**See [LOCAL_DEVELOPMENT.md](./LOCAL_DEVELOPMENT.md) for complete local development guide.**
 
 ### Environment Configuration
 
@@ -195,6 +321,8 @@ pytest --cov=src/ctrl_alt_heal --cov-report=html
 
 ## 📚 **Documentation**
 
+**📌 See the [Quick Links](#-quick-links) section above for easy navigation to all documentation.**
+
 For comprehensive documentation, see the [docs/](./docs/) directory:
 
 - **[📖 Documentation Index](./docs/README.md)** - Complete documentation overview
@@ -202,7 +330,6 @@ For comprehensive documentation, see the [docs/](./docs/) directory:
 - **[🔧 Development Guide](./docs/development.md)** - Setup and development workflow
 - **[📊 Core Services](./docs/core-services.md)** - Core infrastructure documentation
 - **[📋 Data Models](./docs/data-models.md)** - Data model documentation
-- **[🔄 Refactoring History](./docs/refactoring-history.md)** - Complete refactoring journey
 
 ## 📱 Usage
 
@@ -225,25 +352,27 @@ For comprehensive documentation, see the [docs/](./docs/) directory:
 
 ### Environment Variables
 
-```env
-# Telegram Configuration
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_WEBHOOK_SECRET=your_webhook_secret
+The application uses environment variables for configuration. A comprehensive example file is provided:
 
-# AWS Configuration
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_REGION=ap-southeast-1
+```bash
+# Copy the example environment file
+cp env.example .env
 
-# Amazon Bedrock
-BEDROCK_MODEL_ID=amazon.nova-1
-
-# Database Configuration
-DATABASE_URL=your_database_url
-
-# FHIR Server
-FHIR_SERVER_URL=your_fhir_server_url
+# Edit with your actual values
+nano .env  # or your preferred editor
 ```
+
+**Key Environment Variables:**
+- `AWS_REGION` - AWS region (default: ap-southeast-1)
+- `BEDROCK_MODEL_ID` - Amazon Bedrock model (default: apac.amazon.nova-lite-v1:0)
+- `TELEGRAM_SECRET_NAME` - AWS Secrets Manager secret name for Telegram bot token
+- `SERPER_SECRET_NAME` - AWS Secrets Manager secret name for Serper API key
+- `UPLOADS_BUCKET_NAME` - S3 bucket for file uploads
+- `ASSETS_BUCKET_NAME` - S3 bucket for application assets
+
+**Security Note:** Sensitive values (API keys, tokens) are stored in AWS Secrets Manager, not as environment variables.
+
+See `env.example` for the complete list of configuration options.
 
 ### Virtual environment (recommended)
 ```bash
@@ -384,6 +513,64 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: [Wiki](https://github.com/your-username/Ctrl-Alt-Heal/wiki)
 - **Issues**: [GitHub Issues](https://github.com/your-username/Ctrl-Alt-Heal/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/your-username/Ctrl-Alt-Heal/discussions)
+
+## 🔧 **Troubleshooting**
+
+### Common Issues
+
+#### **Bedrock Access Denied**
+```bash
+# Check if Bedrock is enabled in your region
+aws bedrock list-foundation-models --region ap-southeast-1
+
+# Enable Bedrock access in AWS Console
+# Go to: Bedrock > Model access > Request model access
+```
+
+#### **Docker Build Fails**
+```bash
+# Ensure Docker is running
+docker --version
+
+# Check available disk space
+df -h
+
+# Clean up Docker cache
+docker system prune -a
+```
+
+#### **CDK Bootstrap Issues**
+```bash
+# Bootstrap CDK manually
+cdk bootstrap aws://ACCOUNT-ID/ap-southeast-1
+
+# Check CDK version
+cdk --version
+```
+
+#### **Telegram Webhook Not Working**
+```bash
+# Check webhook status
+curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
+
+# Delete webhook and set again
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook"
+```
+
+#### **Fargate Service Not Starting**
+```bash
+# Check ECS service status
+aws ecs describe-services --cluster ctrl-alt-heal-cluster --services ctrl-alt-heal-service
+
+# Check CloudWatch logs
+aws logs describe-log-groups --log-group-name-prefix "/aws/ecs/ctrl-alt-heal"
+```
+
+### Getting Help
+
+- **Issues**: Create a GitHub issue with deployment logs
+- **Documentation**: Check the [docs/](./docs/) directory
+- **AWS Support**: For AWS-specific issues
 
 ## 🙏 Acknowledgments
 

@@ -33,7 +33,21 @@ def prescription_extraction_tool(
     logger = logging.getLogger(__name__)
 
     try:
-        extractor = Bedrock(model_id=settings.bedrock_multimodal_model_id)
+        import os
+
+        # Check if we should use mock mode for local development
+        use_mock = (
+            os.getenv("LOCAL_DEVELOPMENT", "false").lower() == "true"
+            or os.getenv("MOCK_AWS_SERVICES", "false").lower() == "true"
+        )
+
+        if use_mock:
+            logger.info("Using mock Bedrock for prescription extraction")
+            from ctrl_alt_heal.infrastructure.mock_bedrock import get_mock_bedrock
+
+            extractor = get_mock_bedrock()
+        else:
+            extractor = Bedrock(model_id=settings.bedrock_multimodal_model_id)
 
         result = extract_prescription(
             extractor,

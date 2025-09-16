@@ -42,7 +42,7 @@ This guide provides comprehensive instructions for setting up, developing, and c
 
 5. **Configure environment**
    ```bash
-   cp .env.example .env
+   cp env.example .env
    # Edit .env with your configuration
    ```
 
@@ -311,42 +311,49 @@ record_metric(
 
 ## 🚀 **Local Development**
 
-### Local Lambda Testing
+### **Quick Local Setup**
 
 ```bash
-# Install local Lambda testing tools
-pip install aws-lambda-runtime-api
+# Set up local development environment
+python scripts/setup_local_dev.py
 
-# Run Lambda locally
-python -m aws_lambda_runtime_api --handler src.ctrl_alt_heal.worker.handler
-```
-
-### Local Webhook Testing
-
-```bash
-# Start local webhook server
+# Start local server
 python scripts/local_webhook.py
-
-# Expose with ngrok
-ngrok http 8080
-
-# Set Telegram webhook
-export WEBHOOK_URL="https://your-ngrok-url.ngrok.io/telegram/webhook"
-python scripts/set_telegram_webhook.py
 ```
 
-### Database Local Development
+The local server will be available at:
+- **API**: http://localhost:8000
+- **Health Check**: http://localhost:8000/health
+- **API Documentation**: http://localhost:8000/docs
+- **Webhook Endpoint**: http://localhost:8000/webhook
+
+### **Local AWS Services (Optional)**
+
+For complete local development without AWS dependencies:
 
 ```bash
-# Start local DynamoDB
-docker run -p 8000:8000 amazon/dynamodb-local
-
-# Create tables
-python scripts/create_local_tables.py
-
-# Seed test data
-python scripts/seed_test_data.py
+# Start LocalStack (DynamoDB, S3, Secrets Manager)
+docker run -d \
+  --name localstack \
+  -p 4566:4566 \
+  -p 8000:8000 \
+  -e SERVICES=dynamodb,s3,secretsmanager \
+  localstack/localstack
 ```
+
+### **Telegram Webhook Testing**
+
+```bash
+# Expose local server with ngrok
+ngrok http 8000
+
+# Set webhook to your ngrok URL
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://your-ngrok-url.ngrok.io/webhook"}'
+```
+
+**See [LOCAL_DEVELOPMENT.md](../LOCAL_DEVELOPMENT.md) for complete local development guide.**
 
 ## 🔧 **Configuration Management**
 

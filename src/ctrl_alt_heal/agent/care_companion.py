@@ -409,6 +409,21 @@ def get_agent(
     user: User, conversation_history: ConversationHistory | None = None
 ) -> Agent:
     """Returns a new agent instance on every invocation."""
+    import os
+
+    # Check if we should use mock mode for local development
+    use_mock = (
+        os.getenv("LOCAL_DEVELOPMENT", "false").lower() == "true"
+        or os.getenv("MOCK_AWS_SERVICES", "false").lower() == "true"
+    )
+
+    if use_mock:
+        logger = logging.getLogger(__name__)
+        logger.info("Using mock agent for local development")
+        from ctrl_alt_heal.agent.mock_agent import get_mock_agent
+
+        return get_mock_agent(user, conversation_history)
+
     base_system_prompt = get_system_prompt()
 
     # Enhance system prompt with user context and notes
