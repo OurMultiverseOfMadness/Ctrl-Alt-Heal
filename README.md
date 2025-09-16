@@ -62,6 +62,23 @@ Ctrl-Alt-Heal is an intelligent Telegram bot designed to bridge the gap between 
 - **API Gateway**: External HTTPS access
 - **Container**: Docker with Python 3.12
 
+## 🏆 Hackathon Submission
+
+This repository is submitted for a hackathon and contains:
+
+- **Complete Application Code**: Full AI-powered healthcare companion
+- **Infrastructure as Code**: AWS CDK deployment scripts
+- **Comprehensive Documentation**: Detailed setup and usage instructions
+- **Test Suite**: 400+ tests with 95%+ coverage
+- **Open Source**: MIT License for community use
+
+### Repository Structure
+- **`src/`** - Main application source code with README files in each directory
+- **`cdk/`** - AWS infrastructure definitions
+- **`tests/`** - Comprehensive test suite
+- **`docs/`** - Complete documentation
+- **`scripts/`** - Utility scripts for development and deployment
+
 ## 🚀 **Quick Start**
 
 ### Prerequisites
@@ -247,6 +264,32 @@ AWS_PROFILE=your-sso-profile npm run deploy
 npm run deploy -- --profile your-sso-profile
 ```
 
+## 🧪 Testing Instructions
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage
+pytest --cov=src/ctrl_alt_heal --cov-report=html
+
+# Run specific test categories
+pytest tests/unit/              # Unit tests only
+pytest tests/integration/       # Integration tests only
+
+# Run quality checks
+./scripts/run_quality_checks.sh
+```
+
+### Test Coverage
+- **400+ Tests**: Comprehensive test suite covering all components
+- **95%+ Coverage**: High code coverage ensuring reliability
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: End-to-end workflow testing
+- **Mocking**: External dependencies properly mocked
+
 ## 🧪 Development
 
 ### Project Structure
@@ -260,37 +303,18 @@ Ctrl-Alt-Heal/
 │   ├── domain/                 # Data models and domain logic
 │   ├── infrastructure/         # External service integrations
 │   ├── interface/              # Interface implementations
-│   ├── services/               # Business logic services
 │   ├── tools/                  # AI agent tools
-│   ├── utils/                  # Utility functions
-│   └── worker.py               # Main Lambda handler
-├── tests/                      # Test suite (417+ tests)
+│   └── utils/                  # Utility functions
+├── tests/                      # Test suite (400+ tests)
 │   ├── unit/                   # Unit tests
 │   ├── integration/            # Integration tests
-│   └── tools/                  # Tool-specific tests
+│   └── fixtures/               # Test data and fixtures
 ├── cdk/                        # Infrastructure as Code
 ├── docs/                       # Comprehensive documentation
 ├── scripts/                    # Utility scripts
 └── config/                     # Configuration files
 ```
 
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=src/ctrl_alt_heal --cov-report=html
-
-# Run specific test categories
-pytest tests/unit/              # Unit tests only
-pytest tests/integration/       # Integration tests only
-pytest tests/tools/             # Tool tests only
-
-# Run with verbose output
-pytest -v
-```
 
 ### Code Quality
 

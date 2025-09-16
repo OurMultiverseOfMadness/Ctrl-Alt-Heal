@@ -41,12 +41,6 @@ pytest-mock>=3.11.0
 Faker>=20.0.0
 freezegun>=1.2.0
 moto>=4.2.0
-ruff>=0.1.0
-coverage>=7.3.0
-
-# AWS CDK (for deployment)
-aws-cdk-lib>=2.100.0
-constructs>=10.3.0
 
 # Utilities
 werkzeug>=3.0.0

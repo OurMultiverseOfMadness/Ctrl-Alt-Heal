@@ -6,10 +6,10 @@ This guide provides comprehensive instructions for setting up, developing, and c
 
 ### Prerequisites
 
-- **Python 3.8+** (3.11+ recommended)
+- **Python 3.12+** (required for Fargate deployment)
 - **Node.js 18+** (for CDK)
 - **AWS CLI** with configured credentials
-- **Docker** (optional, for containerized development)
+- **Docker** (for container builds)
 - **Git**
 
 ### Environment Setup
@@ -22,8 +22,8 @@ This guide provides comprehensive instructions for setting up, developing, and c
 
 2. **Create virtual environment**
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**

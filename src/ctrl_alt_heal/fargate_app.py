@@ -300,7 +300,13 @@ async def handle_photo_message(
 ) -> None:
     """Handle photo messages."""
     logger.info("Photo message detected. Starting image processing workflow.")
-    uploads_bucket = os.environ["UPLOADS_BUCKET_NAME"]
+    uploads_bucket = os.environ.get("UPLOADS_BUCKET_NAME")
+    if not uploads_bucket:
+        logger.error("UPLOADS_BUCKET_NAME environment variable not found.")
+        send_telegram_message_with_retry(
+            chat_id, "Sorry, there was a configuration error. Please try again later."
+        )
+        return
 
     # Get the file_id of the largest photo
     photo_array = message.get("photo", [])
@@ -318,7 +324,14 @@ async def handle_photo_message(
         return
 
     # Download the image
-    secret_value = get_secret(os.environ["TELEGRAM_SECRET_NAME"])
+    telegram_secret_name = os.environ.get("TELEGRAM_SECRET_NAME")
+    if not telegram_secret_name:
+        logger.error("TELEGRAM_SECRET_NAME environment variable not found.")
+        send_telegram_message_with_retry(
+            chat_id, "Sorry, there was a configuration error. Please try again later."
+        )
+        return
+    secret_value = get_secret(telegram_secret_name)
     token = secret_value.get("bot_token") or secret_value.get("value")
     download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
 

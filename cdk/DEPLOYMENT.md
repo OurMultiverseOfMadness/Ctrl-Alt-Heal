@@ -8,8 +8,8 @@ This guide provides step-by-step instructions for deploying Ctrl-Alt-Heal to a n
 
 1. **AWS CLI** configured with appropriate permissions
 2. **Node.js** 18+ installed
-3. **Python** 3.11+ installed
-4. **Docker** (for building Lambda layers)
+3. **Python** 3.12+ installed
+4. **Docker** (for container builds)
 5. **Amazon Bedrock access** in ap-southeast-1 region
 
 ### **One-Command Deployment**

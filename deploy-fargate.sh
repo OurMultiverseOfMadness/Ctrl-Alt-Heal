@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 # Default values
 ENVIRONMENT=${ENVIRONMENT:-"production"}
-PROJECT_NAME=${PROJECT_NAME:-"Cara-Agents"}
+PROJECT_NAME=${PROJECT_NAME:-"CtrlAltHeal"}
 AWS_REGION=${AWS_REGION:-"ap-southeast-1"}
 AWS_PROFILE=${AWS_PROFILE:-""}
 

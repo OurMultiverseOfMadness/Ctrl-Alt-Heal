@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-PROJECT_NAME=${PROJECT_NAME:-"cara-agents"}
+PROJECT_NAME=${PROJECT_NAME:-"ctrl-alt-heal"}
 ENVIRONMENT=${ENVIRONMENT:-"production"}
 AWS_REGION=${AWS_REGION:-"ap-southeast-1"}
 

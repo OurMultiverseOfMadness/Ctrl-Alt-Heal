@@ -397,7 +397,9 @@ def get_system_prompt() -> str:
     Fetches the system prompt from S3.
     The result is cached in memory for the lifetime of the Lambda container.
     """
-    bucket = os.environ["ASSETS_BUCKET_NAME"]
+    bucket = os.environ.get("ASSETS_BUCKET_NAME")
+    if not bucket:
+        raise ValueError("ASSETS_BUCKET_NAME environment variable not found.")
     key = "system_prompt.txt"
     response = s3.get_object(Bucket=bucket, Key=key)
     return response["Body"].read().decode("utf-8")

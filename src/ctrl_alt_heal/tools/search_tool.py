@@ -23,7 +23,10 @@ from ctrl_alt_heal.infrastructure.secrets import get_secret
 )
 def search_tool(query: str) -> str:
     """A tool for searching information on the web."""
-    api_key = get_secret(os.environ["SERPER_SECRET_NAME"])["api_key"]
+    serper_secret_name = os.environ.get("SERPER_SECRET_NAME")
+    if not serper_secret_name:
+        return "SERPER_SECRET_NAME environment variable not found."
+    api_key = get_secret(serper_secret_name)["api_key"]
     if not api_key:
         return "SERPER_API_KEY not found."
 

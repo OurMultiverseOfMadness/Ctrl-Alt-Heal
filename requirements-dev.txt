@@ -1,7 +1,21 @@
 -r requirements.txt
-fastapi
-pytest
-mock
-moto
-aws-cdk-lib
-constructs
+
+# Development and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+Faker>=20.0.0
+freezegun>=1.2.0
+moto>=4.2.0
+ruff>=0.1.0
+coverage>=7.3.0
+
+# AWS CDK (for deployment)
+aws-cdk-lib>=2.100.0
+constructs>=10.3.0
+
+# Type checking
+mypy>=1.5.0
+types-requests>=2.31.0
+types-PyYAML>=6.0.0
+types-pytz>=2023.3
