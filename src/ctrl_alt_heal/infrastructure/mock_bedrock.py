@@ -5,7 +5,6 @@ This module provides mock implementations of Bedrock services that can be used
 for local development and testing without requiring actual Bedrock access.
 """
 
-import json
 import logging
 from dataclasses import dataclass
 
@@ -53,30 +52,22 @@ class MockBedrock(PrescriptionExtractor):
         ]
 
         # Create mock prescriptions
-        prescriptions = []
+        prescriptions: list[Prescription] = []
         for med_data in mock_prescriptions:
             prescription = Prescription(
-                prescription_id=f"mock-prescription-{len(prescriptions) + 1}",
-                user_id=data.user_id,
                 name=med_data["name"],
                 dosage=med_data["dosage"],
                 frequency=med_data["frequency"],
-                frequency_text=med_data["frequency"],
                 duration_days=med_data["duration_days"],
-                total_amount=med_data["totalAmount"],
-                additional_instructions=med_data["additionalInstructions"],
-                prescription_date="2024-01-01",  # Mock date
-                created_at="2024-01-01T00:00:00Z",
-                updated_at="2024-01-01T00:00:00Z",
+                totalAmount=med_data["totalAmount"],
+                additionalInstructions=med_data["additionalInstructions"],
             )
             prescriptions.append(prescription)
 
         return ExtractionResult(
-            success=True,
             prescriptions=prescriptions,
-            raw_response=json.dumps(mock_prescriptions),
-            extraction_method="mock_bedrock",
-            confidence_score=0.95,
+            raw_json={"mock_data": mock_prescriptions},
+            confidence=0.95,
         )
 
 

@@ -21,7 +21,7 @@ class MockAgent:
     ):
         self.user = user
         self.conversation_history = conversation_history
-        self.tools = []
+        self.tools: list[Any] = []
 
     async def run(self, message: str) -> Dict[str, Any]:
         """Mock agent response for local development."""

@@ -155,8 +155,7 @@ class FargateStack(Stack):
         container = task_definition.add_container(
             "CtrlAltHealContainer",
             image=ecs.ContainerImage.from_ecr_repository(
-                repository=ecr_repository,
-                tag="latest"
+                repository=ecr_repository, tag="latest"
             ),
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix="ctrl-alt-heal",
@@ -224,7 +223,9 @@ class FargateStack(Stack):
             desired_count=1,  # Start with 1 task, auto-scaling will handle scaling up to 2
             assign_public_ip=False,  # No public IP needed with ALB
             security_groups=[fargate_security_group],
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
         )
 
         # Attach Fargate service to ALB target group
@@ -241,8 +242,12 @@ class FargateStack(Stack):
         scaling.scale_on_request_count(
             "ScaleOnRequestCount",
             requests_per_target=1,  # Scale up when there's 1 request per target
-            scale_in_cooldown=cdk.Duration.minutes(15),  # Wait 15 minutes before scaling down
-            scale_out_cooldown=cdk.Duration.seconds(60),  # Wait 1 minute before scaling up
+            scale_in_cooldown=cdk.Duration.minutes(
+                15
+            ),  # Wait 15 minutes before scaling down
+            scale_out_cooldown=cdk.Duration.seconds(
+                60
+            ),  # Wait 1 minute before scaling up
             target_group=target_group,
         )
 

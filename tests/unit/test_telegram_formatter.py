@@ -226,7 +226,7 @@ class TestTelegramMessageBuilder:
         # Check that part numbers are added
         for i, message in enumerate(messages):
             if len(messages) > 1:
-                assert f"Part {i+1} of {len(messages)}" in message["text"]
+                assert f"Part {i + 1} of {len(messages)}" in message["text"]
 
     def test_clean_text(self):
         """Test text cleaning."""

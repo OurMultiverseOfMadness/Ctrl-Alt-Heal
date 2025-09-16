@@ -12,17 +12,21 @@ import json
 import subprocess
 from pathlib import Path
 
+
 def run_command(cmd, description):
     """Run a command and handle errors."""
     print(f"🔄 {description}...")
     try:
-        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd, shell=True, check=True, capture_output=True, text=True
+        )
         print(f"✅ {description} completed")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ {description} failed: {e}")
         print(f"Error output: {e.stderr}")
         return False
+
 
 def create_local_env():
     """Create a local development environment file."""
@@ -101,6 +105,7 @@ MOCK_AWS_SERVICES=true
 
     print("✅ Created .env.local file")
 
+
 def setup_localstack():
     """Set up LocalStack for local AWS services."""
     print("🔄 Setting up LocalStack for local AWS services...")
@@ -133,12 +138,14 @@ def setup_localstack():
         print("❌ Failed to start LocalStack")
         return False
 
+
 def create_local_tables():
     """Create local DynamoDB tables."""
     print("🔄 Creating local DynamoDB tables...")
 
     # Wait for LocalStack to be ready
     import time
+
     time.sleep(5)
 
     tables = [
@@ -146,7 +153,7 @@ def create_local_tables():
         "ctrl_alt_heal_local_conversation_history",
         "ctrl_alt_heal_local_prescriptions",
         "ctrl_alt_heal_local_identities",
-        "ctrl_alt_heal_local_fhir_data"
+        "ctrl_alt_heal_local_fhir_data",
     ]
 
     for table in tables:
@@ -167,6 +174,7 @@ def create_local_tables():
         else:
             print(f"❌ Failed to create table {table}")
 
+
 def main():
     """Main setup function."""
     print("🚀 Setting up Ctrl-Alt-Heal local development environment...")
@@ -180,11 +188,13 @@ def main():
     print("This will start Docker containers for DynamoDB, S3, and Secrets Manager")
     response = input("Set up LocalStack? (y/n): ").lower().strip()
 
-    if response in ['y', 'yes']:
+    if response in ["y", "yes"]:
         if setup_localstack():
             create_local_tables()
         else:
-            print("⚠️  LocalStack setup failed. You can still run the app with real AWS services.")
+            print(
+                "⚠️  LocalStack setup failed. You can still run the app with real AWS services."
+            )
     else:
         print("ℹ️  Skipping LocalStack setup. You'll need to use real AWS services.")
 
@@ -201,6 +211,7 @@ def main():
     print("\n4. For Telegram webhook testing, use ngrok:")
     print("   ngrok http 8000")
     print("   # Then set webhook URL in Telegram")
+
 
 if __name__ == "__main__":
     main()

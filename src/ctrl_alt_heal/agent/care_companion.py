@@ -4,6 +4,7 @@ import logging
 import os
 import boto3
 from functools import lru_cache
+from typing import Any
 
 from strands import Agent
 from strands.models.bedrock import BedrockModel
@@ -407,7 +408,7 @@ def get_system_prompt() -> str:
 
 def get_agent(
     user: User, conversation_history: ConversationHistory | None = None
-) -> Agent:
+) -> Agent | Any:
     """Returns a new agent instance on every invocation."""
     import os
 

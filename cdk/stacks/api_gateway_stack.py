@@ -138,6 +138,7 @@ class ApiGatewayStack(Stack):
 
         # Output the API Gateway URL
         from aws_cdk import CfnOutput
+
         CfnOutput(
             self,
             "ApiGatewayURL",

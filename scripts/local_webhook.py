@@ -18,10 +18,10 @@ sys.path.insert(0, str(src_path))
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
 
 def main():
     """Run the local development server."""
@@ -41,7 +41,7 @@ def main():
             host="0.0.0.0",
             port=8000,
             reload=True,  # Enable auto-reload for development
-            log_level="info"
+            log_level="info",
         )
 
     except ImportError as e:
@@ -52,6 +52,7 @@ def main():
     except Exception as e:
         logger.error(f"Failed to start server: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

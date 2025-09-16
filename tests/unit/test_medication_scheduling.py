@@ -27,11 +27,14 @@ class TestMedicationScheduling:
         #     "additionalInstructions": "Take with food",
         # }
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = [
@@ -90,11 +93,14 @@ class TestMedicationScheduling:
             updated_at="2024-01-01T00:00:00Z",
         )
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = []  # No prescriptions
@@ -128,11 +134,14 @@ class TestMedicationScheduling:
         # medication_name = "Test Medication"
         # duration_days = 7
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = [
@@ -170,11 +179,14 @@ class TestMedicationScheduling:
         # medication_name = "Non-existent Medication"
         # duration_days = 7
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = [
@@ -244,11 +256,14 @@ class TestMedicationScheduling:
             updated_at="2024-01-01T00:00:00Z",
         )
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = [
@@ -287,11 +302,14 @@ class TestMedicationScheduling:
 
         # medication_name = "Test Medication"
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = [
@@ -327,11 +345,14 @@ class TestMedicationScheduling:
             updated_at="2024-01-01T00:00:00Z",
         )
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = [
@@ -377,11 +398,14 @@ class TestMedicationScheduling:
             updated_at="2024-01-01T00:00:00Z",
         )
 
-        with patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
-        ) as mock_prescriptions_store, patch(
-            "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
-        ) as mock_users_store:
+        with (
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.PrescriptionsStore"
+            ) as mock_prescriptions_store,
+            patch(
+                "ctrl_alt_heal.tools.medication_schedule_tool.UsersStore"
+            ) as mock_users_store,
+        ):
             mock_prescriptions_instance = Mock()
             mock_prescriptions_store.return_value = mock_prescriptions_instance
             mock_prescriptions_instance.list_prescriptions.return_value = [

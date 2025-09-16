@@ -455,7 +455,7 @@ class TelegramMessageBuilder:
         messages = []
         for i, part in enumerate(parts):
             if len(parts) > 1:
-                part = f"{part}\n\n*Part {i+1} of {len(parts)}*"
+                part = f"{part}\n\n*Part {i + 1} of {len(parts)}*"
 
             formatted = self.formatter.format_message(part)
             messages.append(formatted)
