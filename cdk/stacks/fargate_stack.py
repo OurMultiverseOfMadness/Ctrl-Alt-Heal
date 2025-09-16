@@ -221,7 +221,7 @@ class FargateStack(Stack):
             "CtrlAltHealFargateService",
             cluster=cluster,
             task_definition=task_definition,
-            desired_count=0,  # Start with 0 tasks, auto-scaling will handle scaling up
+            desired_count=1,  # Start with 1 task, auto-scaling will handle scaling up to 2
             assign_public_ip=False,  # No public IP needed with ALB
             security_groups=[fargate_security_group],
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
@@ -231,9 +231,9 @@ class FargateStack(Stack):
         fargate_service.attach_to_application_target_group(target_group)
 
         # Auto Scaling Configuration
-        # Enable auto-scaling to scale to 0 when no activity
+        # Enable auto-scaling with minimum 1 task for always-on availability
         scaling = fargate_service.auto_scale_task_count(
-            min_capacity=0,  # Allow scaling to 0
+            min_capacity=1,  # Always keep at least 1 task running
             max_capacity=2,  # Maximum 2 tasks during high load
         )
 
