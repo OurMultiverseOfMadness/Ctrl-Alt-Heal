@@ -9,26 +9,26 @@ The core services are built using modern software engineering patterns to ensure
 ```mermaid
 graph TB
     subgraph "Core Services Layer"
-        DI[Dependency Injection Container]
-        Cache[Multi-Layer Caching]
-        Log[Structured Logging]
-        Security[Security Manager]
-        Health[Health Monitor]
-        Config[Configuration Manager]
-        AWS[AWS Client Manager]
+        DI["Dependency Injection Container"]
+        Cache["Multi-Layer Caching"]
+        Log["Structured Logging"]
+        Security["Security Manager"]
+        Health["Health Monitor"]
+        Config["Configuration Manager"]
+        AWS["AWS Client Manager"]
     end
 
     subgraph "Application Layer"
-        Agent[AI Agent]
-        Tools[Tool Registry]
-        API[API Handlers]
+        Agent["AI Agent"]
+        Tools["Tool Registry"]
+        API["API Handlers"]
     end
 
     subgraph "Infrastructure Layer"
-        DynamoDB[(DynamoDB)]
-        Bedrock[Amazon Bedrock]
-        S3[(S3)]
-        Secrets[Secrets Manager]
+        DynamoDB[("DynamoDB")]
+        Bedrock["Amazon Bedrock"]
+        S3[("S3")]
+        Secrets["Secrets Manager"]
     end
 
     Agent --> DI
@@ -103,18 +103,18 @@ The caching system provides multiple layers of caching for optimal performance:
 ```mermaid
 graph LR
     subgraph "Cache Layers"
-        L1[L1: In-Memory Cache]
-        L2[L2: Redis Cache]
-        L3[L3: Database/External]
+        L1["L1: In-Memory Cache"]
+        L2["L2: Redis Cache"]
+        L3["L3: Database/External"]
     end
 
     subgraph "Cache Manager"
-        CM[Cache Manager]
-        Stats[Cache Statistics]
-        TTL[TTL Management]
+        CM["Cache Manager"]
+        Stats["Cache Statistics"]
+        TTL["TTL Management"]
     end
 
-    App[Application] --> CM
+    App["Application"] --> CM
     CM --> L1
     CM --> L2
     CM --> L3
@@ -286,23 +286,23 @@ def api_endpoint():
 ```mermaid
 graph TB
     subgraph "Health Checks"
-        AWS[AWS Services]
-        App[Application Health]
-        Memory[Memory Usage]
-        Response[Response Times]
+        AWS["AWS Services"]
+        App["Application Health"]
+        Memory["Memory Usage"]
+        Response["Response Times"]
     end
 
     subgraph "Health Monitor"
-        HM[Health Monitor]
-        Metrics[Metrics Collector]
-        Alerts[Alert Manager]
+        HM["Health Monitor"]
+        Metrics["Metrics Collector"]
+        Alerts["Alert Manager"]
     end
 
     subgraph "External Services"
-        S3[(S3)]
-        DynamoDB[(DynamoDB)]
-        Bedrock[Bedrock]
-        Secrets[Secrets Manager]
+        S3[("S3")]
+        DynamoDB[("DynamoDB")]
+        Bedrock["Bedrock"]
+        Secrets["Secrets Manager"]
     end
 
     AWS --> S3

@@ -4,33 +4,18 @@
 
 ```mermaid
 graph TB
-    %% External Users
-    User[👤 Telegram User] --> TG[📱 Telegram Bot API]
-
-    %% API Gateway Layer
-    TG --> AGW[🌐 API Gateway<br/>HTTPS Endpoints]
-
-    %% Load Balancer
-    AGW --> ALB[⚖️ Application Load Balancer<br/>Health Checks]
-
-    %% Fargate Service
-    ALB --> Fargate[🐳 Fargate Service<br/>FastAPI Application]
-
-    %% Agent Layer
-    Fargate --> Agent[🤖 Care Companion Agent<br/>AWS Strands + Bedrock]
-
-    %% Tools Layer
-    Agent --> Tools[🛠️ Tool Registry<br/>13+ Specialized Tools]
-
-    %% Infrastructure Services
-    Tools --> DynamoDB[(🗄️ DynamoDB Tables)]
-    Tools --> S3[(📦 S3 Buckets)]
-    Tools --> Secrets[(🔐 Secrets Manager)]
-    Tools --> Bedrock[🧠 Amazon Bedrock<br/>Claude 3.5 Sonnet]
-
-    %% External APIs
-    Tools --> Serper[🔍 Serper API<br/>Web Search]
-    Tools --> TelegramAPI[📡 Telegram API<br/>File Sending]
+    User["👤 Telegram User"] --> TG["📱 Telegram Bot API"]
+    TG --> AGW["🌐 API Gateway"]
+    AGW --> ALB["⚖️ Application Load Balancer"]
+    ALB --> Fargate["🐳 Fargate Service"]
+    Fargate --> Agent["🤖 Care Companion Agent"]
+    Agent --> Tools["🛠️ Tool Registry"]
+    Tools --> DynamoDB[("🗄️ DynamoDB Tables")]
+    Tools --> S3[("📦 S3 Buckets")]
+    Tools --> Secrets[("🔐 Secrets Manager")]
+    Tools --> Bedrock["🧠 Amazon Bedrock"]
+    Tools --> Serper["🔍 Serper API"]
+    Tools --> TelegramAPI["📡 Telegram API"]
 
     %% Data Flow Styling
     classDef external fill:#e1f5fe
@@ -46,93 +31,39 @@ graph TB
     class Serper,TelegramAPI api
 ```
 
-## Detailed Component Architecture
+## Application Components
 
 ```mermaid
 graph TB
-    %% User Interaction Flow
-    subgraph "External Layer"
-        User[👤 Telegram User]
-        TG[📱 Telegram Bot API]
+    subgraph "Application Layer"
+        Fargate["🐳 Fargate Service"]
+        Webhook["📥 Webhook Handler"]
+        ChatAPI["💬 Chat Endpoints"]
+        AgentCore["🤖 Agent Orchestrator"]
     end
 
-    %% AWS Infrastructure
-    subgraph "AWS Infrastructure"
-        subgraph "API & Load Balancing"
-            AGW[🌐 API Gateway<br/>• HTTPS Endpoints<br/>• CORS Support<br/>• Request Routing]
-            ALB[⚖️ Application Load Balancer<br/>• Health Checks (/health)<br/>• Target Group<br/>• Security Groups]
-        end
-
-        subgraph "Compute Layer"
-            subgraph "ECS Fargate"
-                Fargate[🐳 Fargate Service<br/>• FastAPI Application<br/>• Uvicorn Server<br/>• Container Health]
-
-                subgraph "Application Components"
-                    Webhook[📥 Webhook Handler<br/>• Telegram Integration<br/>• Async Processing]
-                    ChatAPI[💬 Chat Endpoints<br/>• Direct API Access<br/>• Streaming Responses]
-                    AgentCore[🤖 Agent Orchestrator<br/>• Message Routing<br/>• Session Management]
-                end
-            end
-        end
-
-        subgraph "AI & Agent Layer"
-            StrandsAgent[🧠 AWS Strands Agent<br/>• Care Companion (Cara)<br/>• Claude 3.5 Sonnet<br/>• System Prompt]
-
-            subgraph "Tool Registry"
-                PrescriptionTools[💊 Prescription Tools<br/>• Extraction<br/>• Scheduling<br/>• ICS Generation]
-                UserTools[👤 User Tools<br/>• Profile Management<br/>• Identity Linking]
-                MedicalTools[🏥 Medical Tools<br/>• Web Search<br/>• FHIR Storage]
-                TimezoneTools[🌍 Timezone Tools<br/>• Detection<br/>• Calendar Integration]
-                MediaTools[🖼️ Media Tools<br/>• Image Analysis<br/>• Description]
-            end
-        end
-
-        subgraph "Data Layer"
-            subgraph "DynamoDB Tables"
-                Users[(👥 User Profiles<br/>• user_id PK)]
-                Identities[(🔐 External Identities<br/>• identity_key PK)]
-                Conversations[(💬 Conversation History<br/>• user_id PK, session_id SK)]
-                Prescriptions[(💊 Medical Prescriptions<br/>• user_id PK, prescription_id SK)]
-                FHIR[(🏥 FHIR Resources<br/>• user_id PK, resource_id SK)]
-            end
-
-            subgraph "S3 Storage"
-                Uploads[(📁 User Uploads<br/>• Images, Files)]
-                Assets[(📦 System Assets<br/>• System Prompt, Config)]
-            end
-
-            subgraph "Secrets Management"
-                TelegramSecret[(🤖 Telegram Bot Token)]
-                SerperSecret[(🔍 Serper API Key)]
-            end
-        end
-
-        subgraph "AI Services"
-            Bedrock[🧠 Amazon Bedrock<br/>• Claude 3.5 Sonnet<br/>• Model Inference]
-        end
+    subgraph "AI Layer"
+        StrandsAgent["🧠 AWS Strands Agent"]
+        PrescriptionTools["💊 Prescription Tools"]
+        UserTools["👤 User Tools"]
+        MedicalTools["🏥 Medical Tools"]
+        TimezoneTools["🌍 Timezone Tools"]
+        MediaTools["🖼️ Media Tools"]
     end
 
-    %% External Services
-    subgraph "External APIs"
-        SerperAPI[🔍 Serper API<br/>• Web Search<br/>• Medical Information]
-        TelegramAPI[📡 Telegram API<br/>• Message Sending<br/>• File Uploads]
+    subgraph "Data Layer"
+        Users[("👥 User Profiles")]
+        Identities[("🔐 External Identities")]
+        Conversations[("💬 Conversation History")]
+        Prescriptions[("💊 Medical Prescriptions")]
+        FHIR[("🏥 FHIR Resources")]
+        Uploads[("📁 User Uploads")]
+        Assets[("📦 System Assets")]
     end
-
-    %% Network & Security
-    subgraph "Network Layer"
-        VPC[🌐 VPC<br/>• Private Subnets<br/>• Security Groups<br/>• NAT Gateway]
-    end
-
-    %% Data Flow Connections
-    User --> TG
-    TG --> AGW
-    AGW --> ALB
-    ALB --> Fargate
 
     Fargate --> Webhook
     Fargate --> ChatAPI
     Fargate --> AgentCore
-
     AgentCore --> StrandsAgent
     StrandsAgent --> PrescriptionTools
     StrandsAgent --> UserTools
@@ -140,65 +71,31 @@ graph TB
     StrandsAgent --> TimezoneTools
     StrandsAgent --> MediaTools
 
-    %% Tool to Data Connections
     PrescriptionTools --> Prescriptions
     PrescriptionTools --> FHIR
     UserTools --> Users
     UserTools --> Identities
     MedicalTools --> Conversations
     TimezoneTools --> Users
-
-    %% Media Processing
     MediaTools --> Uploads
     MediaTools --> Assets
-
-    %% External API Connections
-    MedicalTools --> SerperAPI
-    PrescriptionTools --> TelegramAPI
-    UserTools --> TelegramAPI
-
-    %% AI Service Connections
-    StrandsAgent --> Bedrock
-
-    %% Secrets Access
-    Fargate --> TelegramSecret
-    Fargate --> SerperSecret
-
-    %% Network Connections
-    Fargate --> VPC
-    ALB --> VPC
-
-    %% Styling
-    classDef external fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef aws fill:#ffeb3b,stroke:#f57f17,stroke-width:2px
-    classDef compute fill:#4caf50,stroke:#2e7d32,stroke-width:2px
-    classDef storage fill:#2196f3,stroke:#1565c0,stroke-width:2px
-    classDef api fill:#ff9800,stroke:#e65100,stroke-width:2px
-    classDef network fill:#9c27b0,stroke:#6a1b9a,stroke-width:2px
-
-    class User,TG external
-    class AGW,ALB,Fargate,Webhook,ChatAPI,AgentCore,StrandsAgent,Bedrock aws
-    class PrescriptionTools,UserTools,MedicalTools,TimezoneTools,MediaTools compute
-    class Users,Identities,Conversations,Prescriptions,FHIR,Uploads,Assets,TelegramSecret,SerperSecret storage
-    class SerperAPI,TelegramAPI api
-    class VPC network
 ```
 
 ## Data Flow Architecture
 
 ```mermaid
 sequenceDiagram
-    participant User as 👤 Telegram User
-    participant TG as 📱 Telegram API
-    participant AGW as 🌐 API Gateway
-    participant ALB as ⚖️ Load Balancer
-    participant Fargate as 🐳 Fargate Service
-    participant Agent as 🤖 Care Agent
-    participant Tools as 🛠️ Tools
-    participant DB as 🗄️ DynamoDB
-    participant S3 as 📦 S3
-    participant Bedrock as 🧠 Bedrock
-    participant Serper as 🔍 Serper API
+    participant User as "Telegram User"
+    participant TG as "Telegram API"
+    participant AGW as "API Gateway"
+    participant ALB as "Load Balancer"
+    participant Fargate as "Fargate Service"
+    participant Agent as "Care Agent"
+    participant Tools as "Tools"
+    participant DB as "DynamoDB"
+    participant S3 as "S3"
+    participant Bedrock as "Bedrock"
+    participant Serper as "Serper API"
 
     %% Message Flow
     User->>TG: Send message/image
@@ -240,29 +137,29 @@ sequenceDiagram
 graph TB
     subgraph "Security Layers"
         subgraph "Network Security"
-            VPC[🌐 VPC Isolation]
-            SG_ALB[🛡️ ALB Security Group<br/>• Port 80/443 from API Gateway]
-            SG_Fargate[🛡️ Fargate Security Group<br/>• Port 8000 from ALB]
-            NAT[🌐 NAT Gateway<br/>• Outbound Internet Access]
+            VPC["🌐 VPC Isolation"]
+            SG_ALB["🛡️ ALB Security Group"]
+            SG_Fargate["🛡️ Fargate Security Group"]
+            NAT["🌐 NAT Gateway"]
         end
 
         subgraph "Application Security"
-            IAM_Role[🔑 IAM Role<br/>• Least Privilege Access]
-            Secrets[🔐 Secrets Manager<br/>• Encrypted API Keys]
-            SSL[🔒 SSL/TLS<br/>• HTTPS Encryption]
+            IAM_Role["🔑 IAM Role"]
+            Secrets["🔐 Secrets Manager"]
+            SSL["🔒 SSL/TLS"]
         end
 
         subgraph "Data Security"
-            DDB_Encryption[🔐 DynamoDB Encryption<br/>• At Rest & In Transit]
-            S3_Encryption[🔐 S3 Encryption<br/>• Server-Side Encryption]
-            KMS[🔑 KMS Keys<br/>• Key Management]
+            DDB_Encryption["🔐 DynamoDB Encryption"]
+            S3_Encryption["🔐 S3 Encryption"]
+            KMS["🔑 KMS Keys"]
         end
     end
 
     subgraph "Access Control"
-        API_Key[🔑 API Gateway Keys<br/>• Rate Limiting]
-        User_Auth[👤 User Authentication<br/>• Telegram Chat ID Validation]
-        Session_Mgmt[💬 Session Management<br/>• Conversation History]
+        API_Key["🔑 API Gateway Keys"]
+        User_Auth["👤 User Authentication"]
+        Session_Mgmt["💬 Session Management"]
     end
 
     %% Connections
@@ -301,33 +198,33 @@ graph TB
 graph TB
     subgraph "CDK Stacks"
         subgraph "Database Stack"
-            DB_Stack[🗄️ DatabaseStack<br/>• DynamoDB Tables<br/>• S3 Buckets<br/>• IAM Roles]
+            DB_Stack["🗄️ DatabaseStack"]
         end
 
         subgraph "Secrets Stack"
-            Secrets_Stack[🔐 SecretsStack<br/>• Telegram Token<br/>• Serper API Key]
+            Secrets_Stack["🔐 SecretsStack"]
         end
 
         subgraph "Fargate Stack"
-            Fargate_Stack[🐳 FargateStack<br/>• ECS Cluster<br/>• Fargate Service<br/>• Application Load Balancer<br/>• ECR Repository]
+            Fargate_Stack["🐳 FargateStack"]
         end
 
         subgraph "API Gateway Stack"
-            API_Stack[🌐 ApiGatewayStack<br/>• REST API<br/>• Routes<br/>• Integration]
+            API_Stack["🌐 ApiGatewayStack"]
         end
     end
 
     subgraph "Deployment Order"
-        Step1[1️⃣ Deploy Database]
-        Step2[2️⃣ Deploy Secrets]
-        Step3[3️⃣ Deploy Fargate]
-        Step4[4️⃣ Deploy API Gateway]
+        Step1["1️⃣ Deploy Database"]
+        Step2["2️⃣ Deploy Secrets"]
+        Step3["3️⃣ Deploy Fargate"]
+        Step4["4️⃣ Deploy API Gateway"]
     end
 
     subgraph "Docker Pipeline"
-        Build[🔨 Build Image]
-        Push[📤 Push to ECR]
-        Deploy[🚀 Deploy to Fargate]
+        Build["🔨 Build Image"]
+        Push["📤 Push to ECR"]
+        Deploy["🚀 Deploy to Fargate"]
     end
 
     %% Dependencies

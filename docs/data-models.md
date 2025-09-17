@@ -27,8 +27,8 @@ classDiagram
 
     class ConversationHistory {
         +String user_id
-        +List~Message~ history
-        +Dict~String, Any~ state
+        +List history
+        +Dict state
         +DateTime last_updated
         +String session_id
     }
@@ -38,7 +38,7 @@ classDiagram
         +String content
         +DateTime timestamp
         +String message_id
-        +Dict~String, Any~ metadata
+        +Dict metadata
     }
 
     class Prescription {
@@ -51,18 +51,18 @@ classDiagram
         +DateTime prescription_date
         +Int duration_days
         +String status
-        +Dict~String, Any~ metadata
+        +Dict metadata
     }
 
     class MedicationSchedule {
         +String schedule_id
         +String user_id
         +String prescription_id
-        +List~String~ times
+        +List times
         +DateTime start_date
         +DateTime end_date
         +String status
-        +Dict~String, Any~ reminders
+        +Dict reminders
     }
 
     class HealthMetric {
@@ -71,7 +71,7 @@ classDiagram
         +Float value
         +String unit
         +DateTime timestamp
-        +Dict~String, Any~ tags
+        +Dict tags
     }
 
     class SecurityEvent {
@@ -80,7 +80,7 @@ classDiagram
         +String user_id
         +String ip_address
         +DateTime timestamp
-        +Dict~String, Any~ details
+        +Dict details
     }
 
     User "1" -- "1..*" Identity : has
@@ -444,8 +444,8 @@ erDiagram
 
     ConversationHistory {
         string user_id PK
-        array history
-        object state
+        list history
+        dict state
         datetime last_updated
         string session_id
     }
@@ -455,7 +455,7 @@ erDiagram
         string content
         datetime timestamp
         string message_id
-        object metadata
+        dict metadata
     }
 
     Prescription {
@@ -468,18 +468,18 @@ erDiagram
         datetime prescription_date
         int duration_days
         string status
-        object metadata
+        dict metadata
     }
 
     MedicationSchedule {
         string schedule_id PK
         string user_id FK
         string prescription_id FK
-        array times
+        list times
         datetime start_date
         datetime end_date
         string status
-        object reminders
+        dict reminders
     }
 ```
 

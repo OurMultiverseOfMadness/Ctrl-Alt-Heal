@@ -147,30 +147,30 @@ Once the handler has the internal `user_id`, it uses that single ID to fetch all
 ```mermaid
 sequenceDiagram
     participant Telegram
-    participant Lambda Handler (main.py)
+    participant LambdaHandler as "Lambda Handler"
     participant IdentitiesStore
     participant UsersStore
     participant HistoryStore
     participant Agent
 
-    Telegram->>Lambda Handler (main.py): Sends Message (with chat_id)
-    Lambda Handler (main.py)->>IdentitiesStore: find_user_id_by_identity(chat_id)
-    IdentitiesStore-->>Lambda Handler (main.py): Returns internal_user_id
+    Telegram->>LambdaHandler: Sends Message (with chat_id)
+    LambdaHandler->>IdentitiesStore: find_user_id_by_identity(chat_id)
+    IdentitiesStore-->>LambdaHandler: Returns internal_user_id
 
-    Lambda Handler (main.py)->>HistoryStore: get_history(internal_user_id)
-    HistoryStore-->>Lambda Handler (main.py): Returns ConversationHistory object
+    LambdaHandler->>HistoryStore: get_history(internal_user_id)
+    HistoryStore-->>LambdaHandler: Returns ConversationHistory object
 
-    Lambda Handler (main.py)->>Agent: Initializes Agent with history
-    Lambda Handler (main.py)->>Agent: agent.invoke(message)
+    LambdaHandler->>Agent: Initializes Agent with history
+    LambdaHandler->>Agent: agent.invoke(message)
 
     Note over Agent: Agent decides to call a tool,<br/>e.g., create_google_calendar_event_tool
 
-    Agent-->>Lambda Handler (main.py): Returns tool_call (with internal_user_id)
+    Agent-->>LambdaHandler: Returns tool_call (with internal_user_id)
 
-    Lambda Handler (main.py)->>UsersStore: Tool logic calls get_user(internal_user_id)
-    UsersStore-->>Lambda Handler (main.py): Returns User object (with timezone, etc.)
+    LambdaHandler->>UsersStore: Tool logic calls get_user(internal_user_id)
+    UsersStore-->>LambdaHandler: Returns User object (with timezone, etc.)
 
-    Note over Lambda Handler (main.py): Tool executes using user details
+    Note over LambdaHandler: Tool executes using user details
 ```
 
 This is a living document and should be updated as the application evolves.
