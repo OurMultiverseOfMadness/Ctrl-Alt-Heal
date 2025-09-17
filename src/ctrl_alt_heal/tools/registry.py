@@ -37,6 +37,13 @@ from ..agent.care_companion import (
     wrapped_generate_single_medication_ics_tool,
 )
 
+# Import MCP appointment tools
+from .mcp_appointment_tool import (
+    mcp_list_doctors_tool,
+    mcp_clinic_contact_tool,
+    mcp_make_appointment_tool,
+)
+
 # A simple registry for tools that need to be manually invoked
 tool_registry: dict[str, Callable[..., Any]] = {
     "prescription_extraction": prescription_extraction_tool,
@@ -61,4 +68,7 @@ tool_registry: dict[str, Callable[..., Any]] = {
     "show_all_medications": show_all_medications_tool,
     "generate_medication_ics": wrapped_generate_medication_ics_tool,
     "generate_single_medication_ics": wrapped_generate_single_medication_ics_tool,
+    "mcp_list_doctors": mcp_list_doctors_tool,
+    "mcp_clinic_contact": mcp_clinic_contact_tool,
+    "mcp_make_appointment": mcp_make_appointment_tool,
 }

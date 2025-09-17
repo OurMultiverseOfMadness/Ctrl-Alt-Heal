@@ -44,6 +44,11 @@ from ctrl_alt_heal.tools.medication_ics_tool import (
     generate_medication_ics_tool,
     generate_single_medication_ics_tool,
 )
+from ctrl_alt_heal.tools.mcp_appointment_tool import (
+    mcp_list_doctors_tool,
+    mcp_clinic_contact_tool,
+    mcp_make_appointment_tool,
+)
 from ctrl_alt_heal.interface.telegram_sender import send_telegram_file
 from datetime import datetime
 from strands import tool
@@ -515,6 +520,9 @@ def get_agent(
             show_all_medications_tool,
             wrapped_generate_medication_ics_tool,
             wrapped_generate_single_medication_ics_tool,
+            mcp_list_doctors_tool,
+            mcp_clinic_contact_tool,
+            mcp_make_appointment_tool,
         ],
     )
     return agent
